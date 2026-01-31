@@ -1,0 +1,23 @@
+{
+  "name": "monorepo",
+  "version": "1.0.0",
+  "description": "Monorepo with web, api, and strategy services",
+  "private": true,
+  "workspaces": [
+    "web",
+    "api",
+    "strategy"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspaces",
+    "build": "npm run build --workspaces",
+    "test": "npm run test --workspaces",
+    "clean": "npm run clean --workspaces"
+  },
+  "devDependencies": {},
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  }
+}
+

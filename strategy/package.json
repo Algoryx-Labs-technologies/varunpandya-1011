@@ -1,0 +1,15 @@
+{
+  "name": "@monorepo/strategy",
+  "version": "1.0.0",
+  "description": "Strategy service",
+  "private": true,
+  "scripts": {
+    "dev": "echo 'Strategy dev server - configure your framework'",
+    "build": "echo 'Strategy build - configure your framework'",
+    "test": "echo 'Strategy tests - configure your test framework'",
+    "clean": "echo 'Strategy clean - configure cleanup'"
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}
+

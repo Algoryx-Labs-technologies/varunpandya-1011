@@ -1,0 +1,15 @@
+{
+  "name": "@monorepo/web",
+  "version": "1.0.0",
+  "description": "Web frontend service",
+  "private": true,
+  "scripts": {
+    "dev": "echo 'Web dev server - configure your framework'",
+    "build": "echo 'Web build - configure your framework'",
+    "test": "echo 'Web tests - configure your test framework'",
+    "clean": "echo 'Web clean - configure cleanup'"
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}
+
