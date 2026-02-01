@@ -1,12 +1,11 @@
 {
   "name": "monorepo",
   "version": "1.0.0",
-  "description": "Monorepo with web, api, and strategy services",
+  "description": "Monorepo with web and api services",
   "private": true,
   "workspaces": [
-    "web",
-    "api",
-    "strategy"
+    "apps/web",
+    "apps/api"
   ],
   "scripts": {
     "dev": "npm run dev --workspaces",
