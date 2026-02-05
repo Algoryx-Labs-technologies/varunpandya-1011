@@ -131,6 +131,158 @@ Authorization: Bearer <jwtToken>
 }
 ```
 
+### Portfolio Endpoints
+
+#### 1. Get Holding
+**GET** `/api/portfolio/holding`
+
+Retrieve holding (long-term equity delivery stocks).
+
+**Headers:**
+```
+Authorization: Bearer <jwtToken>
+```
+
+**Response:**
+```json
+{
+  "tradingsymbol": "TATASTEEL-EQ",
+  "exchange": "NSE",
+  "isin": "INE081A01020",
+  "t1quantity": 0,
+  "realisedquantity": 2,
+  "quantity": 2,
+  "authorisedquantity": 0,
+  "product": "DELIVERY",
+  "collateralquantity": null,
+  "collateraltype": null,
+  "haircut": 0,
+  "averageprice": 111.87,
+  "ltp": 130.15,
+  "symboltoken": "3499",
+  "close": 129.6,
+  "profitandloss": 37,
+  "pnlpercentage": 16.34
+}
+```
+
+#### 2. Get All Holdings
+**GET** `/api/portfolio/holdings`
+
+Retrieve all holdings with summary information.
+
+**Headers:**
+```
+Authorization: Bearer <jwtToken>
+```
+
+**Response:**
+```json
+{
+  "status": true,
+  "message": "SUCCESS",
+  "errorcode": "",
+  "data": {
+    "holdings": [
+      {
+        "tradingsymbol": "TATASTEEL-EQ",
+        "exchange": "NSE",
+        "isin": "INE081A01020",
+        "quantity": 2,
+        "averageprice": 111.87,
+        "ltp": 130.15,
+        "profitandloss": 37,
+        "pnlpercentage": 16.34
+      }
+    ],
+    "totalholding": {
+      "totalholdingvalue": 5294,
+      "totalinvvalue": 5116,
+      "totalprofitandloss": 178.14,
+      "totalpnlpercentage": 3.48
+    }
+  }
+}
+```
+
+#### 3. Get Position
+**GET** `/api/portfolio/position`
+
+Retrieve position portfolio (net and day positions).
+
+**Headers:**
+```
+Authorization: Bearer <jwtToken>
+```
+
+**Response:**
+```json
+{
+  "status": true,
+  "message": "SUCCESS",
+  "errorcode": "",
+  "data": [
+    {
+      "exchange": "NSE",
+      "symboltoken": "2885",
+      "producttype": "DELIVERY",
+      "tradingsymbol": "RELIANCE-EQ",
+      "symbolname": "RELIANCE",
+      "netqty": "1",
+      "netprice": "2235.80",
+      "netvalue": "- 2235.80"
+    }
+  ]
+}
+```
+
+#### 4. Convert Position
+**POST** `/api/portfolio/convert-position`
+
+Convert position from one product type to another (e.g., DELIVERY to INTRADAY).
+
+**Headers:**
+```
+Authorization: Bearer <jwtToken>
+```
+
+**Request Body:**
+```json
+{
+  "exchange": "NSE",
+  "symboltoken": "2885",
+  "oldproducttype": "DELIVERY",
+  "newproducttype": "INTRADAY",
+  "tradingsymbol": "RELIANCE-EQ",
+  "symbolname": "RELIANCE",
+  "instrumenttype": "",
+  "priceden": "1",
+  "pricenum": "1",
+  "genden": "1",
+  "gennum": "1",
+  "precision": "2",
+  "multiplier": "-1",
+  "boardlotsize": "1",
+  "buyqty": "1",
+  "sellqty": "0",
+  "buyamount": "2235.80",
+  "sellamount": "0",
+  "transactiontype": "BUY",
+  "quantity": 1,
+  "type": "DAY"
+}
+```
+
+**Response:**
+```json
+{
+  "status": true,
+  "message": "SUCCESS",
+  "errorcode": "",
+  "data": null
+}
+```
+
 ### Health Check
 
 **GET** `/health`

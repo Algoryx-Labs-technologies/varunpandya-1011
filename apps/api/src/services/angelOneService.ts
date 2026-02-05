@@ -9,6 +9,13 @@ import {
   ProfileResponse,
   AngelOneApiHeaders,
 } from '../types/auth';
+import {
+  GetHoldingResponse,
+  GetAllHoldingResponse,
+  GetPositionResponse,
+  ConvertPositionRequest,
+  ConvertPositionResponse,
+} from '../types/portfolio';
 import { ANGEL_ONE_CONFIG } from '../config/angelOne';
 
 export class AngelOneService {
@@ -113,6 +120,104 @@ export class AngelOneService {
 
     const response = await this.client.get<ProfileResponse>(
       ANGEL_ONE_CONFIG.ENDPOINTS.PROFILE,
+      { headers }
+    );
+
+    return response.data;
+  }
+
+  /**
+   * Get holding
+   */
+  async getHolding(
+    authorizationToken: string,
+    clientLocalIP: string,
+    clientPublicIP: string,
+    macAddress: string
+  ): Promise<GetHoldingResponse> {
+    const headers = this.buildHeaders(
+      clientLocalIP,
+      clientPublicIP,
+      macAddress,
+      authorizationToken
+    );
+
+    const response = await this.client.get<GetHoldingResponse>(
+      ANGEL_ONE_CONFIG.ENDPOINTS.GET_HOLDING,
+      { headers }
+    );
+
+    return response.data;
+  }
+
+  /**
+   * Get all holdings
+   */
+  async getAllHolding(
+    authorizationToken: string,
+    clientLocalIP: string,
+    clientPublicIP: string,
+    macAddress: string
+  ): Promise<GetAllHoldingResponse> {
+    const headers = this.buildHeaders(
+      clientLocalIP,
+      clientPublicIP,
+      macAddress,
+      authorizationToken
+    );
+
+    const response = await this.client.get<GetAllHoldingResponse>(
+      ANGEL_ONE_CONFIG.ENDPOINTS.GET_ALL_HOLDING,
+      { headers }
+    );
+
+    return response.data;
+  }
+
+  /**
+   * Get position
+   */
+  async getPosition(
+    authorizationToken: string,
+    clientLocalIP: string,
+    clientPublicIP: string,
+    macAddress: string
+  ): Promise<GetPositionResponse> {
+    const headers = this.buildHeaders(
+      clientLocalIP,
+      clientPublicIP,
+      macAddress,
+      authorizationToken
+    );
+
+    const response = await this.client.get<GetPositionResponse>(
+      ANGEL_ONE_CONFIG.ENDPOINTS.GET_POSITION,
+      { headers }
+    );
+
+    return response.data;
+  }
+
+  /**
+   * Convert position
+   */
+  async convertPosition(
+    positionData: ConvertPositionRequest,
+    authorizationToken: string,
+    clientLocalIP: string,
+    clientPublicIP: string,
+    macAddress: string
+  ): Promise<ConvertPositionResponse> {
+    const headers = this.buildHeaders(
+      clientLocalIP,
+      clientPublicIP,
+      macAddress,
+      authorizationToken
+    );
+
+    const response = await this.client.post<ConvertPositionResponse>(
+      ANGEL_ONE_CONFIG.ENDPOINTS.CONVERT_POSITION,
+      positionData,
       { headers }
     );
 

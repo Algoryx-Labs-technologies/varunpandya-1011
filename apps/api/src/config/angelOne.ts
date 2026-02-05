@@ -7,6 +7,10 @@ export const ANGEL_ONE_CONFIG = {
     LOGIN: '/rest/auth/angelbroking/user/v1/loginByPassword',
     GENERATE_TOKEN: '/rest/auth/angelbroking/jwt/v1/generateTokens',
     PROFILE: '/rest/auth/angelbroking/user/v1/getProfile',
+    GET_HOLDING: '/rest/secure/angelbroking/portfolio/v1/getHolding',
+    GET_ALL_HOLDING: '/rest/secure/angelbroking/portfolio/v1/getAllHolding',
+    GET_POSITION: '/rest/secure/angelbroking/order/v1/getPosition',
+    CONVERT_POSITION: '/rest/secure/angelbroking/order/v1/convertPosition',
   },
   DEFAULT_HEADERS: {
     'Content-Type': 'application/json',
