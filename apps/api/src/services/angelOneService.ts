@@ -15,6 +15,10 @@ import {
   ConvertPositionRequest,
   ConvertPositionResponse,
 } from '../types/portfolio';
+import {
+  EstimateChargesRequest,
+  EstimateChargesResponse,
+} from '../types/brokerage';
 import { ANGEL_ONE_CONFIG } from '../config/angelOne';
 
 export class AngelOneService {
@@ -217,6 +221,32 @@ export class AngelOneService {
     const response = await this.client.post<ConvertPositionResponse>(
       ANGEL_ONE_CONFIG.ENDPOINTS.CONVERT_POSITION,
       positionData,
+      { headers }
+    );
+
+    return response.data;
+  }
+
+  /**
+   * Estimate charges for brokerage calculation
+   */
+  async estimateCharges(
+    chargesData: EstimateChargesRequest,
+    authorizationToken: string,
+    clientLocalIP: string,
+    clientPublicIP: string,
+    macAddress: string
+  ): Promise<EstimateChargesResponse> {
+    const headers = this.buildHeaders(
+      clientLocalIP,
+      clientPublicIP,
+      macAddress,
+      authorizationToken
+    );
+
+    const response = await this.client.post<EstimateChargesResponse>(
+      ANGEL_ONE_CONFIG.ENDPOINTS.ESTIMATE_CHARGES,
+      chargesData,
       { headers }
     );
 

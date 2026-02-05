@@ -11,6 +11,7 @@ export const ANGEL_ONE_CONFIG = {
     GET_ALL_HOLDING: '/rest/secure/angelbroking/portfolio/v1/getAllHolding',
     GET_POSITION: '/rest/secure/angelbroking/order/v1/getPosition',
     CONVERT_POSITION: '/rest/secure/angelbroking/order/v1/convertPosition',
+    ESTIMATE_CHARGES: '/rest/secure/angelbroking/brokerage/v1/estimateCharges',
   },
   DEFAULT_HEADERS: {
     'Content-Type': 'application/json',
