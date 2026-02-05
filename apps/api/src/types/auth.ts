@@ -60,5 +60,6 @@ export interface AngelOneApiHeaders {
   'X-MACAddress': string;
   'X-PrivateKey': string;
   'Authorization'?: string;
+  [key: string]: string | undefined;
 }
 

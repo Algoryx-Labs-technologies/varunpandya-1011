@@ -7,7 +7,6 @@ import {
   GenerateTokenRequest,
   GenerateTokenResponse,
   ProfileResponse,
-  AngelOneApiHeaders,
 } from '../types/auth';
 import {
   GetHoldingResponse,
@@ -40,8 +39,8 @@ export class AngelOneService {
     clientPublicIP: string,
     macAddress: string,
     authorizationToken?: string
-  ): AngelOneApiHeaders {
-    const headers: AngelOneApiHeaders = {
+  ): Record<string, string> {
+    const headers: Record<string, string> = {
       ...ANGEL_ONE_CONFIG.DEFAULT_HEADERS,
       'X-ClientLocalIP': clientLocalIP,
       'X-ClientPublicIP': clientPublicIP,
