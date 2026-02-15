@@ -1,15 +1,15 @@
 {
-  "name": "@monorepo/web",
-  "version": "1.0.0",
-  "description": "Web frontend service",
+  "name": "web",
   "private": true,
+  "version": "0.0.0",
+  "type": "module",
   "scripts": {
-    "dev": "echo 'Web dev server - configure your framework'",
-    "build": "echo 'Web build - configure your framework'",
-    "test": "echo 'Web tests - configure your test framework'",
-    "clean": "echo 'Web clean - configure cleanup'"
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
   },
-  "dependencies": {},
-  "devDependencies": {}
+  "devDependencies": {
+    "typescript": "~5.9.3",
+    "vite": "^7.2.4"
+  }
 }
-

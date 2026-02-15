@@ -1,0 +1,45 @@
+import type { OrderBookItem } from '../types/orderBook'
+
+/** Mock order book data – in real app, replace with API response data */
+export function getOrderBookData(): OrderBookItem[] {
+  return [
+    {
+      variety: 'NORMAL',
+      ordertype: 'LIMIT',
+      producttype: 'INTRADAY',
+      duration: 'DAY',
+      price: '194.00',
+      triggerprice: '0',
+      quantity: '1',
+      disclosedquantity: '0',
+      squareoff: '0',
+      stoploss: '0',
+      trailingstoploss: '0',
+      tradingsymbol: 'NIFTY25FEB25300CE',
+      transactiontype: 'BUY',
+      exchange: 'NSE',
+      symboltoken: null,
+      instrumenttype: '',
+      strikeprice: '-1',
+      optiontype: '',
+      expirydate: '',
+      lotsize: '1',
+      cancelsize: '1',
+      averageprice: '0',
+      filledshares: '0',
+      unfilledshares: '1',
+      orderid: 201020000000080,
+      text: '',
+      status: 'cancelled',
+      orderstatus: 'cancelled',
+      updatetime: '20-Oct-2020 13:10:59',
+      exchtime: '20-Oct-2020 13:10:59',
+      exchorderupdatetime: '20-Oct-2020 13:10:59',
+      fillid: '',
+      filltime: '',
+      parentorderid: '',
+      uniqueorderid: '34reqfachdfih',
+      exchangeorderid: '1100000000048358',
+    },
+  ]
+}
