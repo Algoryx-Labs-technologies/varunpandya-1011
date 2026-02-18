@@ -184,6 +184,198 @@ export interface BrokerageCalculatorResponse {
 }
 
 /**
+ * Holding Item
+ */
+export interface HoldingItem {
+  tradingsymbol: string;
+  exchange: string;
+  isin: string;
+  t1quantity: number;
+  realisedquantity: number;
+  quantity: number;
+  authorisedquantity: number;
+  product: string;
+  collateralquantity: number | null;
+  collateraltype: string | null;
+  haircut: number;
+  averageprice: number;
+  ltp: number;
+  symboltoken: string;
+  close: number;
+  profitandloss: number;
+  pnlpercentage: number;
+}
+
+/**
+ * Get Holding Response
+ */
+export interface GetHoldingResponse {
+  status: boolean;
+  message: string;
+  errorcode: string;
+  data: HoldingItem[];
+}
+
+/**
+ * Total Holding Summary
+ */
+export interface TotalHoldingSummary {
+  totalholdingvalue: number;
+  totalinvvalue: number;
+  totalprofitandloss: number;
+  totalpnlpercentage: number;
+}
+
+/**
+ * Get All Holdings Response
+ */
+export interface GetAllHoldingsResponse {
+  status: boolean;
+  message: string;
+  errorcode: string;
+  data: {
+    holdings: HoldingItem[];
+    totalholding: TotalHoldingSummary;
+  };
+}
+
+/**
+ * Position Item
+ */
+export interface PositionItem {
+  exchange: string;
+  symboltoken: string;
+  producttype: string;
+  tradingsymbol: string;
+  symbolname: string;
+  instrumenttype: string;
+  priceden: string;
+  pricenum: string;
+  genden: string;
+  gennum: string;
+  precision: string;
+  multiplier: string;
+  boardlotsize: string;
+  buyqty: string;
+  sellqty: string;
+  buyamount: string;
+  sellamount: string;
+  symbolgroup: string;
+  strikeprice: string;
+  optiontype: string;
+  expirydate: string;
+  lotsize: string;
+  cfbuyqty: string;
+  cfsellqty: string;
+  cfbuyamount: string;
+  cfsellamount: string;
+  buyavgprice: string;
+  sellavgprice: string;
+  avgnetprice: string;
+  netvalue: string;
+  netqty: string;
+  totalbuyvalue: string;
+  totalsellvalue: string;
+  cfbuyavgprice: string;
+  cfsellavgprice: string;
+  totalbuyavgprice: string;
+  totalsellavgprice: string;
+  netprice: string;
+}
+
+/**
+ * Get Position Response
+ */
+export interface GetPositionResponse {
+  status: boolean;
+  message: string;
+  errorcode: string;
+  data: PositionItem[];
+}
+
+/**
+ * Convert Position Request
+ */
+export interface ConvertPositionRequest {
+  exchange: string;
+  symboltoken: string;
+  oldproducttype: string;
+  newproducttype: string;
+  tradingsymbol: string;
+  symbolname: string;
+  instrumenttype: string;
+  priceden: string;
+  pricenum: string;
+  genden: string;
+  gennum: string;
+  precision: string;
+  multiplier: string;
+  boardlotsize: string;
+  buyqty: string;
+  sellqty: string;
+  buyamount: string;
+  sellamount: string;
+  transactiontype: string;
+  quantity: number;
+  type: string;
+}
+
+/**
+ * Convert Position Response
+ */
+export interface ConvertPositionResponse {
+  status: boolean;
+  message: string;
+  errorcode: string;
+  data: null;
+}
+
+/**
+ * Margin Calculator Position
+ */
+export interface MarginCalculatorPosition {
+  exchange: string;
+  qty: number;
+  price: number;
+  productType: string;
+  token: string;
+  tradeType: string;
+  orderType?: string;
+}
+
+/**
+ * Margin Calculator Request
+ */
+export interface MarginCalculatorRequest {
+  positions: MarginCalculatorPosition[];
+}
+
+/**
+ * Margin Components
+ */
+export interface MarginComponents {
+  netPremium: number;
+  spanMargin: number;
+  marginBenefit: number;
+  deliveryMargin: number;
+  nonNFOMargin: number;
+  totOptionsPremium: number;
+}
+
+/**
+ * Margin Calculator Response
+ */
+export interface MarginCalculatorResponse {
+  status: boolean;
+  message: string;
+  errorcode: string;
+  data: {
+    totalMarginRequired: number;
+    marginComponents: MarginComponents;
+  };
+}
+
+/**
  * API Error Response
  */
 export interface ApiErrorResponse {

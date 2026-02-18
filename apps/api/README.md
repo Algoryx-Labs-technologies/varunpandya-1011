@@ -284,6 +284,256 @@ Calculate brokerage charges and taxes that will be incurred for placing trades.
 }
 ```
 
+### Portfolio
+
+#### GET `/api/portfolio/holding`
+Get holding - long-term equity delivery stocks in the user's portfolio.
+
+**Headers:**
+- `Authorization: Bearer <jwt_token>` (required)
+
+**Response:**
+```json
+{
+  "status": true,
+  "message": "SUCCESS",
+  "errorcode": "",
+  "data": [
+    {
+      "tradingsymbol": "TATASTEEL-EQ",
+      "exchange": "NSE",
+      "isin": "INE081A01020",
+      "t1quantity": 0,
+      "realisedquantity": 2,
+      "quantity": 2,
+      "authorisedquantity": 0,
+      "product": "DELIVERY",
+      "collateralquantity": null,
+      "collateraltype": null,
+      "haircut": 0,
+      "averageprice": 111.87,
+      "ltp": 130.15,
+      "symboltoken": "3499",
+      "close": 129.6,
+      "profitandloss": 37,
+      "pnlpercentage": 16.34
+    }
+  ]
+}
+```
+
+#### GET `/api/portfolio/all-holdings`
+Get all holdings with comprehensive view including individual stock holdings and summary of total investments.
+
+**Headers:**
+- `Authorization: Bearer <jwt_token>` (required)
+
+**Response:**
+```json
+{
+  "status": true,
+  "message": "SUCCESS",
+  "errorcode": "",
+  "data": {
+    "holdings": [
+      {
+        "tradingsymbol": "TATASTEEL-EQ",
+        "exchange": "NSE",
+        "isin": "INE081A01020",
+        "t1quantity": 0,
+        "realisedquantity": 2,
+        "quantity": 2,
+        "authorisedquantity": 0,
+        "product": "DELIVERY",
+        "collateralquantity": null,
+        "collateraltype": null,
+        "haircut": 0,
+        "averageprice": 111.87,
+        "ltp": 130.15,
+        "symboltoken": "3499",
+        "close": 129.6,
+        "profitandloss": 37,
+        "pnlpercentage": 16.34
+      }
+    ],
+    "totalholding": {
+      "totalholdingvalue": 5294,
+      "totalinvvalue": 5116,
+      "totalprofitandloss": 178.14,
+      "totalpnlpercentage": 3.48
+    }
+  }
+}
+```
+
+#### GET `/api/portfolio/position`
+Get position - returns net and day positions. Net is the actual current net position portfolio, while day is a snapshot of buying and selling activity for that particular day.
+
+**Headers:**
+- `Authorization: Bearer <jwt_token>` (required)
+
+**Response:**
+```json
+{
+  "status": true,
+  "message": "SUCCESS",
+  "errorcode": "",
+  "data": [
+    {
+      "exchange": "NSE",
+      "symboltoken": "2885",
+      "producttype": "DELIVERY",
+      "tradingsymbol": "RELIANCE-EQ",
+      "symbolname": "RELIANCE",
+      "instrumenttype": "",
+      "priceden": "1",
+      "pricenum": "1",
+      "genden": "1",
+      "gennum": "1",
+      "precision": "2",
+      "multiplier": "-1",
+      "boardlotsize": "1",
+      "buyqty": "1",
+      "sellqty": "0",
+      "buyamount": "2235.80",
+      "sellamount": "0",
+      "symbolgroup": "EQ",
+      "strikeprice": "-1",
+      "optiontype": "",
+      "expirydate": "",
+      "lotsize": "1",
+      "cfbuyqty": "0",
+      "cfsellqty": "0",
+      "cfbuyamount": "0",
+      "cfsellamount": "0",
+      "buyavgprice": "2235.80",
+      "sellavgprice": "0",
+      "avgnetprice": "2235.80",
+      "netvalue": "- 2235.80",
+      "netqty": "1",
+      "totalbuyvalue": "2235.80",
+      "totalsellvalue": "0",
+      "cfbuyavgprice": "0",
+      "cfsellavgprice": "0",
+      "totalbuyavgprice": "2235.80",
+      "totalsellavgprice": "0",
+      "netprice": "2235.80"
+    }
+  ]
+}
+```
+
+#### POST `/api/portfolio/convert-position`
+Convert position - change a position's margin product. Each position has one margin product that affects margin usage and free cash values.
+
+**Headers:**
+- `Authorization: Bearer <jwt_token>` (required)
+
+**Request Body:**
+```json
+{
+  "exchange": "NSE",
+  "symboltoken": "2885",
+  "oldproducttype": "DELIVERY",
+  "newproducttype": "INTRADAY",
+  "tradingsymbol": "RELIANCE-EQ",
+  "symbolname": "RELIANCE",
+  "instrumenttype": "",
+  "priceden": "1",
+  "pricenum": "1",
+  "genden": "1",
+  "gennum": "1",
+  "precision": "2",
+  "multiplier": "-1",
+  "boardlotsize": "1",
+  "buyqty": "1",
+  "sellqty": "0",
+  "buyamount": "2235.80",
+  "sellamount": "0",
+  "transactiontype": "BUY",
+  "quantity": 1,
+  "type": "DAY"
+}
+```
+
+**Response:**
+```json
+{
+  "status": true,
+  "message": "SUCCESS",
+  "errorcode": "",
+  "data": null
+}
+```
+
+### Margin Calculator
+
+#### POST `/api/margin/calculate`
+Calculate real-time margin for a basket of positions.
+
+**Note:**
+- Rate limit: 10 requests per second
+- Maximum 50 positions per request
+- Default orderType is "LIMIT" if not provided
+
+**Headers:**
+- `Authorization: Bearer <jwt_token>` (required)
+
+**Request Body:**
+```json
+{
+  "positions": [
+    {
+      "exchange": "NFO",
+      "qty": 50,
+      "price": 0,
+      "productType": "INTRADAY",
+      "token": "67300",
+      "tradeType": "BUY",
+      "orderType": "LIMIT"
+    },
+    {
+      "exchange": "NFO",
+      "qty": 50,
+      "price": 0,
+      "productType": "INTRADAY",
+      "token": "67308",
+      "tradeType": "SELL",
+      "orderType": "MARKET"
+    }
+  ]
+}
+```
+
+**Field Descriptions:**
+- `exchange`: BSE, NSE, NFO, MCX, BFO, CDS
+- `qty`: Quantity (int). For NFO segment, denotes number of units in a lot
+- `price`: Price (int)
+- `productType`: DELIVERY, CARRYFORWARD, MARGIN, INTRADAY, BO
+- `token`: Symbol/token being traded (string)
+- `tradeType`: BUY or SELL
+- `orderType`: LIMIT, MARKET, STOPLOSS_LIMIT, STOPLOSS_MARKET (optional, defaults to LIMIT)
+
+**Response:**
+```json
+{
+  "status": true,
+  "message": "SUCCESS",
+  "errorcode": "",
+  "data": {
+    "totalMarginRequired": 29612.35,
+    "marginComponents": {
+      "netPremium": 5060,
+      "spanMargin": 0,
+      "marginBenefit": 79876.5,
+      "deliveryMargin": 0,
+      "nonNFOMargin": 0,
+      "totOptionsPremium": 10100
+    }
+  }
+}
+```
+
 ### Health Check
 
 #### GET `/health`
@@ -307,7 +557,9 @@ apps/api/
 │   │   └── angelone.config.ts    # AngelOne API configuration
 │   ├── routes/
 │   │   ├── auth.routes.ts         # Authentication routes
-│   │   └── brokerage.routes.ts    # Brokerage calculator routes
+│   │   ├── brokerage.routes.ts    # Brokerage calculator routes
+│   │   ├── portfolio.routes.ts    # Portfolio routes
+│   │   └── margin.routes.ts       # Margin calculator routes
 │   ├── services/
 │   │   └── angelone.service.ts    # AngelOne API service
 │   ├── types/

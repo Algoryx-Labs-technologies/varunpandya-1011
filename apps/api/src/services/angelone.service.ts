@@ -14,6 +14,13 @@ import {
   LogoutResponse,
   BrokerageCalculatorRequest,
   BrokerageCalculatorResponse,
+  GetHoldingResponse,
+  GetAllHoldingsResponse,
+  GetPositionResponse,
+  ConvertPositionRequest,
+  ConvertPositionResponse,
+  MarginCalculatorRequest,
+  MarginCalculatorResponse,
   ApiErrorResponse,
 } from '../types/angelone.types';
 import { angelOneConfig } from '../config/angelone.config';
@@ -255,6 +262,181 @@ export class AngelOneService {
         throw {
           status: false,
           message: error.response.data?.message || 'Failed to estimate brokerage charges',
+          errorcode: error.response.data?.errorcode || 'UNKNOWN_ERROR',
+          data: error.response.data?.data,
+        } as ApiErrorResponse;
+      }
+      throw {
+        status: false,
+        message: error.message || 'Network error',
+        errorcode: 'NETWORK_ERROR',
+      } as ApiErrorResponse;
+    }
+  }
+
+  /**
+   * Get Holding
+   * Retrieve holding - long-term equity delivery stocks
+   */
+  async getHolding(jwtToken: string): Promise<GetHoldingResponse> {
+    try {
+      const config: AxiosRequestConfig = {
+        method: 'GET',
+        url: '/rest/secure/angelbroking/portfolio/v1/getHolding',
+        headers: this.getHeaders({
+          Authorization: `Bearer ${jwtToken}`,
+        }),
+      };
+
+      const response = await this.axiosInstance.request<GetHoldingResponse>(config);
+      return response.data;
+    } catch (error: any) {
+      if (error.response) {
+        throw {
+          status: false,
+          message: error.response.data?.message || 'Failed to fetch holdings',
+          errorcode: error.response.data?.errorcode || 'UNKNOWN_ERROR',
+          data: error.response.data?.data,
+        } as ApiErrorResponse;
+      }
+      throw {
+        status: false,
+        message: error.message || 'Network error',
+        errorcode: 'NETWORK_ERROR',
+      } as ApiErrorResponse;
+    }
+  }
+
+  /**
+   * Get All Holdings
+   * Retrieve all holdings with summary of total investments
+   */
+  async getAllHoldings(jwtToken: string): Promise<GetAllHoldingsResponse> {
+    try {
+      const config: AxiosRequestConfig = {
+        method: 'GET',
+        url: '/rest/secure/angelbroking/portfolio/v1/getAllHolding',
+        headers: this.getHeaders({
+          Authorization: `Bearer ${jwtToken}`,
+        }),
+      };
+
+      const response = await this.axiosInstance.request<GetAllHoldingsResponse>(config);
+      return response.data;
+    } catch (error: any) {
+      if (error.response) {
+        throw {
+          status: false,
+          message: error.response.data?.message || 'Failed to fetch all holdings',
+          errorcode: error.response.data?.errorcode || 'UNKNOWN_ERROR',
+          data: error.response.data?.data,
+        } as ApiErrorResponse;
+      }
+      throw {
+        status: false,
+        message: error.message || 'Network error',
+        errorcode: 'NETWORK_ERROR',
+      } as ApiErrorResponse;
+    }
+  }
+
+  /**
+   * Get Position
+   * Retrieve positions - net and day positions
+   */
+  async getPosition(jwtToken: string): Promise<GetPositionResponse> {
+    try {
+      const config: AxiosRequestConfig = {
+        method: 'GET',
+        url: '/rest/secure/angelbroking/order/v1/getPosition',
+        headers: this.getHeaders({
+          Authorization: `Bearer ${jwtToken}`,
+        }),
+      };
+
+      const response = await this.axiosInstance.request<GetPositionResponse>(config);
+      return response.data;
+    } catch (error: any) {
+      if (error.response) {
+        throw {
+          status: false,
+          message: error.response.data?.message || 'Failed to fetch positions',
+          errorcode: error.response.data?.errorcode || 'UNKNOWN_ERROR',
+          data: error.response.data?.data,
+        } as ApiErrorResponse;
+      }
+      throw {
+        status: false,
+        message: error.message || 'Network error',
+        errorcode: 'NETWORK_ERROR',
+      } as ApiErrorResponse;
+    }
+  }
+
+  /**
+   * Convert Position
+   * Convert or change a position's margin product
+   */
+  async convertPosition(
+    jwtToken: string,
+    request: ConvertPositionRequest
+  ): Promise<ConvertPositionResponse> {
+    try {
+      const config: AxiosRequestConfig = {
+        method: 'POST',
+        url: '/rest/secure/angelbroking/order/v1/convertPosition',
+        headers: this.getHeaders({
+          Authorization: `Bearer ${jwtToken}`,
+        }),
+        data: JSON.stringify(request),
+      };
+
+      const response = await this.axiosInstance.request<ConvertPositionResponse>(config);
+      return response.data;
+    } catch (error: any) {
+      if (error.response) {
+        throw {
+          status: false,
+          message: error.response.data?.message || 'Failed to convert position',
+          errorcode: error.response.data?.errorcode || 'UNKNOWN_ERROR',
+          data: error.response.data?.data,
+        } as ApiErrorResponse;
+      }
+      throw {
+        status: false,
+        message: error.message || 'Network error',
+        errorcode: 'NETWORK_ERROR',
+      } as ApiErrorResponse;
+    }
+  }
+
+  /**
+   * Calculate Margin
+   * Calculate real-time margin for a basket of positions
+   * Rate limit: 10 requests per second
+   * Maximum 50 positions per request
+   */
+  async calculateMargin(
+    jwtToken: string,
+    request: MarginCalculatorRequest
+  ): Promise<MarginCalculatorResponse> {
+    try {
+      const config: AxiosRequestConfig = {
+        method: 'POST',
+        url: '/rest/secure/angelbroking/margin/v1/batch',
+        headers: this.getHeaders({
+          Authorization: `Bearer ${jwtToken}`,
+        }),
+        data: JSON.stringify(request),
+      };
+
+      const response = await this.axiosInstance.request<MarginCalculatorResponse>(config);
+      return response.data;
+    } catch (error: any) {
+      if (error.response) {
+        throw {
+          status: false,
+          message: error.response.data?.message || 'Failed to calculate margin',
           errorcode: error.response.data?.errorcode || 'UNKNOWN_ERROR',
           data: error.response.data?.data,
         } as ApiErrorResponse;
