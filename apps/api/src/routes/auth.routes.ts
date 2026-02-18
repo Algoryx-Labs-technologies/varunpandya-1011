@@ -106,5 +106,81 @@ router.get('/profile', async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * GET /api/auth/rms
+ * Get RMS limit - fund, cash and margin information (requires JWT token)
+ */
+router.get('/rms', async (req: Request, res: Response) => {
+  try {
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({
+        status: false,
+        message: 'Missing or invalid authorization token',
+        errorcode: 'UNAUTHORIZED',
+      });
+    }
+
+    const jwtToken = authHeader.replace('Bearer ', '');
+    const response = await angelOneService.getRMSLimit(jwtToken);
+    res.json(response);
+  } catch (error: any) {
+    const statusCode = error.errorcode === 'UNAUTHORIZED' ? 401 : 500;
+    res.status(statusCode).json({
+      status: false,
+      message: error.message || 'Failed to fetch RMS limit',
+      errorcode: error.errorcode || 'UNKNOWN_ERROR',
+      data: error.data,
+    });
+  }
+});
+
+/**
+ * POST /api/auth/logout
+ * Logout and invalidate session (requires JWT token)
+ */
+router.post('/logout', async (req: Request, res: Response) => {
+  try {
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({
+        status: false,
+        message: 'Missing or invalid authorization token',
+        errorcode: 'UNAUTHORIZED',
+      });
+    }
+
+    const { clientcode } = req.body;
+
+    // Validate required fields
+    if (!clientcode) {
+      return res.status(400).json({
+        status: false,
+        message: 'Missing required field: clientcode is required',
+        errorcode: 'VALIDATION_ERROR',
+      });
+    }
+
+    const jwtToken = authHeader.replace('Bearer ', '');
+    const response = await angelOneService.logout(jwtToken, clientcode);
+    res.json(response);
+  } catch (error: any) {
+    const statusCode =
+      error.errorcode === 'UNAUTHORIZED'
+        ? 401
+        : error.errorcode === 'VALIDATION_ERROR'
+        ? 400
+        : 500;
+    res.status(statusCode).json({
+      status: false,
+      message: error.message || 'Logout failed',
+      errorcode: error.errorcode || 'UNKNOWN_ERROR',
+      data: error.data,
+    });
+  }
+});
+
 export default router;
 

@@ -117,6 +117,60 @@ Get user profile information.
 }
 ```
 
+#### GET `/api/auth/rms`
+Get RMS (Risk Management System) limit - fund, cash and margin information for equity and commodity segments.
+
+**Headers:**
+- `Authorization: Bearer <jwt_token>` (required)
+
+**Response:**
+```json
+{
+  "status": true,
+  "message": "SUCCESS",
+  "errorcode": "",
+  "data": {
+    "net": "9999999999999",
+    "availablecash": "9999999999999",
+    "availableintradaypayin": "0",
+    "availablelimitmargin": "0",
+    "collateral": "0",
+    "m2munrealized": "0",
+    "m2mrealized": "0",
+    "utiliseddebits": "0",
+    "utilisedspan": "0",
+    "utilisedoptionpremium": "0",
+    "utilisedholdingsales": "0",
+    "utilisedexposure": "0",
+    "utilisedturnover": "0",
+    "utilisedpayout": "0"
+  }
+}
+```
+
+#### POST `/api/auth/logout`
+Logout and invalidate the API session. Destroys the access token and requires a new login flow.
+
+**Headers:**
+- `Authorization: Bearer <jwt_token>` (required)
+
+**Request Body:**
+```json
+{
+  "clientcode": "CLIENT_CODE"
+}
+```
+
+**Response:**
+```json
+{
+  "status": true,
+  "message": "SUCCESS",
+  "errorcode": "",
+  "data": ""
+}
+```
+
 ### Health Check
 
 #### GET `/health`

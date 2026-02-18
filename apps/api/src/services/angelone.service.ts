@@ -9,6 +9,9 @@ import {
   GenerateTokenRequest,
   GenerateTokenResponse,
   ProfileResponse,
+  RMSLimitResponse,
+  LogoutRequest,
+  LogoutResponse,
   ApiErrorResponse,
 } from '../types/angelone.types';
 import { angelOneConfig } from '../config/angelone.config';
@@ -142,6 +145,77 @@ export class AngelOneService {
         throw {
           status: false,
           message: error.response.data?.message || 'Failed to fetch profile',
+          errorcode: error.response.data?.errorcode || 'UNKNOWN_ERROR',
+          data: error.response.data?.data,
+        } as ApiErrorResponse;
+      }
+      throw {
+        status: false,
+        message: error.message || 'Network error',
+        errorcode: 'NETWORK_ERROR',
+      } as ApiErrorResponse;
+    }
+  }
+
+  /**
+   * Get RMS Limit
+   * Returns fund, cash and margin information for equity and commodity segments
+   */
+  async getRMSLimit(jwtToken: string): Promise<RMSLimitResponse> {
+    try {
+      const config: AxiosRequestConfig = {
+        method: 'GET',
+        url: '/rest/secure/angelbroking/user/v1/getRMS',
+        headers: this.getHeaders({
+          Authorization: `Bearer ${jwtToken}`,
+        }),
+      };
+
+      const response = await this.axiosInstance.request<RMSLimitResponse>(config);
+      return response.data;
+    } catch (error: any) {
+      if (error.response) {
+        throw {
+          status: false,
+          message: error.response.data?.message || 'Failed to fetch RMS limit',
+          errorcode: error.response.data?.errorcode || 'UNKNOWN_ERROR',
+          data: error.response.data?.data,
+        } as ApiErrorResponse;
+      }
+      throw {
+        status: false,
+        message: error.message || 'Network error',
+        errorcode: 'NETWORK_ERROR',
+      } as ApiErrorResponse;
+    }
+  }
+
+  /**
+   * Logout
+   * Destroys the API session and invalidates the access token
+   */
+  async logout(jwtToken: string, clientcode: string): Promise<LogoutResponse> {
+    try {
+      const requestData: LogoutRequest = {
+        clientcode,
+      };
+
+      const config: AxiosRequestConfig = {
+        method: 'POST',
+        url: '/rest/secure/angelbroking/user/v1/logout',
+        headers: this.getHeaders({
+          Authorization: `Bearer ${jwtToken}`,
+        }),
+        data: JSON.stringify(requestData),
+      };
+
+      const response = await this.axiosInstance.request<LogoutResponse>(config);
+      return response.data;
+    } catch (error: any) {
+      if (error.response) {
+        throw {
+          status: false,
+          message: error.response.data?.message || 'Logout failed',
           errorcode: error.response.data?.errorcode || 'UNKNOWN_ERROR',
           data: error.response.data?.data,
         } as ApiErrorResponse;

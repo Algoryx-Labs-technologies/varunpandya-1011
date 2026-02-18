@@ -80,6 +80,49 @@ export interface AngelOneConfig {
 }
 
 /**
+ * RMS Limit Response
+ * Returns fund, cash and margin information
+ */
+export interface RMSLimitResponse {
+  status: boolean;
+  message: string;
+  errorcode: string;
+  data: {
+    net: string;
+    availablecash: string;
+    availableintradaypayin: string;
+    availablelimitmargin: string;
+    collateral: string;
+    m2munrealized: string;
+    m2mrealized: string;
+    utiliseddebits: string;
+    utilisedspan: string;
+    utilisedoptionpremium: string;
+    utilisedholdingsales: string;
+    utilisedexposure: string;
+    utilisedturnover: string;
+    utilisedpayout: string;
+  };
+}
+
+/**
+ * Logout Request
+ */
+export interface LogoutRequest {
+  clientcode: string;
+}
+
+/**
+ * Logout Response
+ */
+export interface LogoutResponse {
+  status: boolean;
+  message: string;
+  errorcode: string;
+  data: string;
+}
+
+/**
  * API Error Response
  */
 export interface ApiErrorResponse {
