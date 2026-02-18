@@ -6,6 +6,7 @@ import express, { Express, Request, Response } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import authRoutes from './routes/auth.routes';
+import brokerageRoutes from './routes/brokerage.routes';
 import { validateConfig } from './config/angelone.config';
 
 dotenv.config();
@@ -29,6 +30,7 @@ app.get('/health', (req: Request, res: Response) => {
 
 // API Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/brokerage', brokerageRoutes);
 
 // 404 handler
 app.use((req: Request, res: Response) => {
@@ -59,6 +61,7 @@ async function startServer() {
       console.log(`🚀 API server running on port ${PORT}`);
       console.log(`📡 Health check: http://localhost:${PORT}/health`);
       console.log(`🔐 Auth endpoints: http://localhost:${PORT}/api/auth`);
+      console.log(`💰 Brokerage endpoints: http://localhost:${PORT}/api/brokerage`);
     });
   } catch (error: any) {
     console.error('Failed to start server:', error.message);

@@ -171,6 +171,119 @@ Logout and invalidate the API session. Destroys the access token and requires a 
 }
 ```
 
+### Brokerage Calculator
+
+#### POST `/api/brokerage/estimate-charges`
+Calculate brokerage charges and taxes that will be incurred for placing trades.
+
+**Headers:**
+- `Authorization: Bearer <jwt_token>` (required)
+
+**Request Body:**
+```json
+{
+  "orders": [
+    {
+      "product_type": "DELIVERY",
+      "transaction_type": "BUY",
+      "quantity": "10",
+      "price": "800",
+      "exchange": "NSE",
+      "symbol_name": "745AS33",
+      "token": "17117"
+    },
+    {
+      "product_type": "DELIVERY",
+      "transaction_type": "BUY",
+      "quantity": "10",
+      "price": "800",
+      "exchange": "BSE",
+      "symbol_name": "PIICL151223",
+      "token": "726131"
+    }
+  ]
+}
+```
+
+**Response:**
+```json
+{
+  "status": true,
+  "message": "SUCCESS",
+  "errorcode": "",
+  "data": {
+    "summary": {
+      "total_charges": 3.0796,
+      "trade_value": 16000,
+      "breakup": [
+        {
+          "name": "Angel One Brokerage",
+          "amount": 0.0,
+          "msg": "",
+          "breakup": []
+        },
+        {
+          "name": "External Charges",
+          "amount": 2.976,
+          "msg": "",
+          "breakup": [
+            {
+              "name": "Exchange Transaction Charges",
+              "amount": 0.56,
+              "msg": "",
+              "breakup": []
+            },
+            {
+              "name": "Stamp Duty",
+              "amount": 2.4,
+              "msg": "",
+              "breakup": []
+            },
+            {
+              "name": "SEBI Fees",
+              "amount": 0.016,
+              "msg": "",
+              "breakup": []
+            }
+          ]
+        },
+        {
+          "name": "Taxes",
+          "amount": 0.1036,
+          "msg": "",
+          "breakup": [
+            {
+              "name": "Security Transaction Tax",
+              "amount": 0.0,
+              "msg": "",
+              "breakup": []
+            },
+            {
+              "name": "GST",
+              "amount": 0.1036,
+              "msg": "",
+              "breakup": []
+            }
+          ]
+        }
+      ]
+    },
+    "charges": [
+      {
+        "total_charges": 1.5162,
+        "trade_value": 8000,
+        "breakup": [...]
+      },
+      {
+        "total_charges": 1.5634,
+        "trade_value": 8000,
+        "breakup": [...]
+      }
+    ]
+  }
+}
+```
+
 ### Health Check
 
 #### GET `/health`
@@ -193,7 +306,8 @@ apps/api/
 │   ├── config/
 │   │   └── angelone.config.ts    # AngelOne API configuration
 │   ├── routes/
-│   │   └── auth.routes.ts         # Authentication routes
+│   │   ├── auth.routes.ts         # Authentication routes
+│   │   └── brokerage.routes.ts    # Brokerage calculator routes
 │   ├── services/
 │   │   └── angelone.service.ts    # AngelOne API service
 │   ├── types/

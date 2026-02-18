@@ -123,6 +123,67 @@ export interface LogoutResponse {
 }
 
 /**
+ * Brokerage Calculator Order
+ */
+export interface BrokerageOrder {
+  product_type: string;
+  transaction_type: string;
+  quantity: string;
+  price: string;
+  exchange: string;
+  symbol_name: string;
+  token: string;
+}
+
+/**
+ * Brokerage Calculator Request
+ */
+export interface BrokerageCalculatorRequest {
+  orders: BrokerageOrder[];
+}
+
+/**
+ * Charge Breakup Item
+ */
+export interface ChargeBreakupItem {
+  name: string;
+  amount: number;
+  msg: string;
+  breakup: ChargeBreakupItem[];
+}
+
+/**
+ * Charge Summary
+ */
+export interface ChargeSummary {
+  total_charges: number;
+  trade_value: number;
+  breakup: ChargeBreakupItem[];
+}
+
+/**
+ * Charge Detail
+ */
+export interface ChargeDetail {
+  total_charges: number;
+  trade_value: number;
+  breakup: ChargeBreakupItem[];
+}
+
+/**
+ * Brokerage Calculator Response
+ */
+export interface BrokerageCalculatorResponse {
+  status: boolean;
+  message: string;
+  errorcode: string;
+  data: {
+    summary: ChargeSummary;
+    charges: ChargeDetail[];
+  };
+}
+
+/**
  * API Error Response
  */
 export interface ApiErrorResponse {

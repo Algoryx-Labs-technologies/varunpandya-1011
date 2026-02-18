@@ -12,6 +12,8 @@ import {
   RMSLimitResponse,
   LogoutRequest,
   LogoutResponse,
+  BrokerageCalculatorRequest,
+  BrokerageCalculatorResponse,
   ApiErrorResponse,
 } from '../types/angelone.types';
 import { angelOneConfig } from '../config/angelone.config';
@@ -216,6 +218,43 @@ export class AngelOneService {
         throw {
           status: false,
           message: error.response.data?.message || 'Logout failed',
+          errorcode: error.response.data?.errorcode || 'UNKNOWN_ERROR',
+          data: error.response.data?.data,
+        } as ApiErrorResponse;
+      }
+      throw {
+        status: false,
+        message: error.message || 'Network error',
+        errorcode: 'NETWORK_ERROR',
+      } as ApiErrorResponse;
+    }
+  }
+
+  /**
+   * Estimate Brokerage Charges
+   * Calculate brokerage charges and taxes for placing trades
+   */
+  async estimateBrokerageCharges(
+    jwtToken: string,
+    request: BrokerageCalculatorRequest
+  ): Promise<BrokerageCalculatorResponse> {
+    try {
+      const config: AxiosRequestConfig = {
+        method: 'POST',
+        url: '/rest/secure/angelbroking/brokerage/v1/estimateCharges',
+        headers: this.getHeaders({
+          Authorization: `Bearer ${jwtToken}`,
+        }),
+        data: JSON.stringify(request),
+      };
+
+      const response = await this.axiosInstance.request<BrokerageCalculatorResponse>(config);
+      return response.data;
+    } catch (error: any) {
+      if (error.response) {
+        throw {
+          status: false,
+          message: error.response.data?.message || 'Failed to estimate brokerage charges',
           errorcode: error.response.data?.errorcode || 'UNKNOWN_ERROR',
           data: error.response.data?.data,
         } as ApiErrorResponse;
