@@ -1,11 +1,33 @@
 import type { RouteKey } from './constants/routes'
-import { getCurrentRoute, navigateTo } from './router'
-import { renderSidebar, renderHeader, renderDashboard, renderTrading, initDashboard, initOrderTradeBookTabs, initTerminalTime } from './components'
+import { getCurrentRoute, navigateTo, protectRoute } from './router'
+import { renderSidebar, renderHeader, renderDashboard, renderTrading, renderAuth, initDashboard, initOrderTradeBookTabs, initTerminalTime, initAuth, initHeader } from './components'
 import { initTradingViewChart } from './lib/tradingView'
+import { isAuthenticated } from './utils/auth'
 
 export function render() {
-  const route = getCurrentRoute()
+  let route = getCurrentRoute()
+  
+  // Protect route - redirect to auth if not authenticated
+  route = protectRoute(route)
+  
+  // If redirected to auth, update URL
+  if (route === 'auth' && isAuthenticated() && window.location.pathname !== '/') {
+    // User is authenticated but somehow on auth page, redirect to dashboard
+    navigateTo('dashboard')
+    route = 'dashboard'
+  }
+  
   const app = document.querySelector<HTMLDivElement>('#app')!
+  
+  if (route === 'auth') {
+    app.className = 'auth-page'
+    app.innerHTML = renderAuth()
+    initAuth()
+    return
+  }
+  
+  app.className = ''
+  
   app.innerHTML = `
     ${renderSidebar(route)}
     <div class="main-wrapper">
@@ -28,6 +50,9 @@ export function render() {
     navigateTo('trading')
     render()
   })
+
+  // Initialize header (includes logout button)
+  initHeader()
 
   if (route === 'dashboard') {
     initDashboard()

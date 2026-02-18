@@ -1,4 +1,5 @@
 export const ROUTES = {
+  auth: '/',
   dashboard: '/Dashboard',
   trading: '/trading',
 } as const
