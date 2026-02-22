@@ -36,6 +36,22 @@ export interface ApiError {
   data?: any
 }
 
+export interface ProfileResponse {
+  status: boolean
+  message: string
+  errorcode: string
+  data: {
+    clientcode: string
+    name: string
+    email: string
+    mobileno: string
+    exchanges: string[] | string
+    products: string[] | string
+    lastlogintime: string
+    brokerid: string
+  }
+}
+
 /**
  * Call login API (validates username/password on server, then calls AngelOne)
  */
@@ -98,6 +114,64 @@ export async function loginToAngelOne(credentials: {
     return data as LoginResponse
   } catch (error: any) {
     console.error('API Call Error:', error)
+    if (error.status === false) {
+      throw error
+    }
+    throw {
+      status: false,
+      message: error.message || 'Network error',
+      errorcode: 'NETWORK_ERROR',
+    } as ApiError
+  }
+}
+
+/**
+ * Get user profile from AngelOne API
+ */
+export async function getProfile(): Promise<ProfileResponse> {
+  try {
+    const token = localStorage.getItem('Angel_token')
+    
+    if (!token) {
+      throw {
+        status: false,
+        message: 'No authentication token found',
+        errorcode: 'UNAUTHORIZED',
+      } as ApiError
+    }
+
+    const response = await fetch(`${API_BASE_URL}/api/auth/profile`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ message: 'Failed to parse error response' }))
+      throw {
+        status: false,
+        message: errorData.message || 'Failed to fetch profile',
+        errorcode: errorData.errorcode || 'HTTP_ERROR',
+        data: errorData.data,
+      } as ApiError
+    }
+
+    const data = await response.json()
+
+    if (!data.status) {
+      throw {
+        status: false,
+        message: data.message || 'Failed to fetch profile',
+        errorcode: data.errorcode || 'UNKNOWN_ERROR',
+        data: data.data,
+      } as ApiError
+    }
+
+    return data as ProfileResponse
+  } catch (error: any) {
     if (error.status === false) {
       throw error
     }

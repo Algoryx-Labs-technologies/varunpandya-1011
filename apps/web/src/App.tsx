@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { getCurrentRoute, navigateTo, type RouteKey } from './router'
 import Sidebar from './components/Sidebar'
 import Header from './components/Header'
 import Dashboard from './components/Dashboard'
 import Trading from './components/Trading'
 import Auth from './components/Auth'
+import Profile from './components/Profile'
 
 export default function App() {
   const [route, setRoute] = useState<RouteKey>(() => getCurrentRoute())
@@ -31,7 +32,9 @@ export default function App() {
       <Sidebar currentRoute={route} onNavigate={handleNavigate} />
       <div className="main-wrapper">
         <Header onNavigate={handleNavigate} />
-        {route === 'dashboard' ? <Dashboard /> : <Trading />}
+        {route === 'dashboard' && <Dashboard />}
+        {route === 'trading' && <Trading />}
+        {route === 'profile' && <Profile />}
       </div>
     </>
   )

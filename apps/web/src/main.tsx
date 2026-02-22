@@ -15,6 +15,10 @@ function initApp() {
     if (window.location.pathname !== '/Dashboard') {
       window.history.replaceState({}, '', '/Dashboard')
     }
+  } else if (path.toLowerCase() === '/profile') {
+    if (window.location.pathname !== '/profile') {
+      window.history.replaceState({}, '', '/profile')
+    }
   } else if (path === '/') {
     // Default to dashboard when auth is disabled
     if (window.location.pathname !== '/Dashboard') {

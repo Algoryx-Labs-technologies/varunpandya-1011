@@ -6,6 +6,7 @@ export function getCurrentRoute(): RouteKey {
   const path = window.location.pathname.replace(/\/$/, '') || '/'
   if (path.toLowerCase() === '/trading') return 'trading'
   if (path.toLowerCase() === '/dashboard') return 'dashboard'
+  if (path.toLowerCase() === '/profile') return 'profile'
   return 'auth'
 }
 

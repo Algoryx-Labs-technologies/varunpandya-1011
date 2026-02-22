@@ -1,4 +1,3 @@
-import React from 'react'
 import type { RouteKey } from '../constants/routes'
 import { logout } from '../utils/auth'
 
@@ -12,13 +11,32 @@ export default function Header({ onNavigate }: HeaderProps) {
     onNavigate('auth')
   }
 
+  const handleProfileClick = () => {
+    onNavigate('profile')
+  }
+
   return (
     <header className="header">
       <div className="header-user">
-        <div className="header-avatar">A</div>
-        <div className="header-user-info">
-          <div className="header-name">Varun Pandya 77929</div>
-        </div>
+        <button
+          type="button"
+          onClick={handleProfileClick}
+          style={{
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            padding: 0,
+          }}
+          aria-label="View Profile"
+        >
+          <div className="header-avatar">A</div>
+          <div className="header-user-info">
+            <div className="header-name">Varun Pandya 77929</div>
+          </div>
+        </button>
       </div>
       <div className="header-actions">
         <button type="button" className="icon-btn" aria-label="Notifications">
