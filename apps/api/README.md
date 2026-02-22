@@ -10,8 +10,13 @@ npm install
 ```
 
 2. Configure environment variables:
-   - Copy `.env.example` to `.env`
-   - Set your `ANGELONE_API_KEY` and other configuration values
+   - Create a `.env` file in the `apps/api` directory
+   - Set the following required variables:
+     - `AUTH_USERNAME` - Username for application authentication
+     - `AUTH_PASSWORD` - Password for application authentication
+     - `ANGELONE_API_KEY` - Your AngelOne API key
+     - `PORT` - Server port (default: 3001)
+     - Other AngelOne configuration values (optional)
 
 ## Development
 
@@ -38,17 +43,24 @@ npm start
 ### Authentication
 
 #### POST `/api/auth/login`
-Login with client code, password, and TOTP.
+Login with username, password (for app auth), client code, PIN, and TOTP (for AngelOne).
 
 **Request Body:**
 ```json
 {
-  "clientcode": "Your_client_code",
-  "password": "Your_pin",
+  "username": "your_app_username",
+  "password": "your_app_password",
+  "clientcode": "Your_AngelOne_client_code",
+  "pin": "Your_AngelOne_PIN",
   "totp": "enter_the_code_displayed_on_your_authenticator_app",
   "state": "optional_state_variable"
 }
 ```
+
+**Authentication Flow:**
+1. Server validates `username` and `password` against `AUTH_USERNAME` and `AUTH_PASSWORD` from environment variables
+2. If valid, server calls AngelOne API with `clientcode`, `pin` (as password), and `totp`
+3. Returns AngelOne JWT token on success
 
 **Response:**
 ```json

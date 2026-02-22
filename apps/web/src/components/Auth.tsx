@@ -34,6 +34,17 @@ export default function Auth({ onNavigate }: AuthProps) {
     let isValid = true
     const newErrors: Record<string, string> = {}
 
+    // Validate all required fields
+    if (!formData.username.trim()) {
+      newErrors.username = 'Username is required'
+      isValid = false
+    }
+
+    if (!formData.password.trim()) {
+      newErrors.password = 'Password is required'
+      isValid = false
+    }
+
     if (!formData.clientcode.trim()) {
       newErrors.clientcode = 'Client code is required'
       isValid = false
@@ -100,12 +111,14 @@ export default function Auth({ onNavigate }: AuthProps) {
 
     try {
       const requestData = {
+        username: formData.username.trim(),
+        password: formData.password.trim(),
         clientcode: formData.clientcode.trim(),
-        password: formData.pin.trim(),
+        pin: formData.pin.trim(),
         totp: formData.totp.trim(),
       }
       
-      console.log('📡 CALLING API with data:', requestData)
+      console.log('📡 CALLING API with data:', { ...requestData, password: '***', pin: '***' })
       console.log('🌐 API URL:', `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000'}/api/auth/login`)
 
       const loginResponse = await loginToAngelOne(requestData)
@@ -123,10 +136,19 @@ export default function Auth({ onNavigate }: AuthProps) {
       const errorMessage = error.message || 'Login failed. Please try again.'
       const errorCode = error.errorcode || ''
       
-      if (errorMessage.toLowerCase().includes('clientcode') || errorCode.includes('CLIENTCODE')) {
+      // Handle different error types
+      if (errorCode === 'UNAUTHORIZED' || errorMessage.toLowerCase().includes('username') || errorMessage.toLowerCase().includes('password')) {
+        // Username/password validation failed
+        if (errorMessage.toLowerCase().includes('username')) {
+          showError('username', errorMessage)
+        } else {
+          showError('password', errorMessage)
+          setFormData((prev) => ({ ...prev, password: '' }))
+        }
+      } else if (errorMessage.toLowerCase().includes('clientcode') || errorCode.includes('CLIENTCODE')) {
         showError('clientcode', errorMessage)
         setFormData((prev) => ({ ...prev, clientcode: '' }))
-      } else if (errorMessage.toLowerCase().includes('pin') || errorMessage.toLowerCase().includes('password') || errorCode.includes('PASSWORD')) {
+      } else if (errorMessage.toLowerCase().includes('pin') || errorCode.includes('PIN')) {
         showError('pin', errorMessage)
         setFormData((prev) => ({ ...prev, pin: '' }))
       } else if (errorMessage.toLowerCase().includes('totp') || errorCode.includes('TOTP')) {

@@ -10,24 +10,53 @@ const router = Router();
 
 /**
  * POST /api/auth/login
- * Login with client code, password, and TOTP
+ * Login with username, password (for app auth), client code, PIN, and TOTP (for AngelOne)
  */
 router.post('/login', async (req: Request, res: Response) => {
   try {
-    const { clientcode, password, totp, state } = req.body;
+    const { username, password, clientcode, pin, totp, state } = req.body;
 
     // Validate required fields
-    if (!clientcode || !password || !totp) {
+    if (!username || !password) {
       return res.status(400).json({
         status: false,
-        message: 'Missing required fields: clientcode, password, and totp are required',
+        message: 'Missing required fields: username and password are required',
         errorcode: 'VALIDATION_ERROR',
       });
     }
 
+    if (!clientcode || !pin || !totp) {
+      return res.status(400).json({
+        status: false,
+        message: 'Missing required fields: clientcode, pin, and totp are required',
+        errorcode: 'VALIDATION_ERROR',
+      });
+    }
+
+    // Validate username and password against environment variables
+    const validUsername = process.env.AUTH_USERNAME;
+    const validPassword = process.env.AUTH_PASSWORD;
+
+    if (!validUsername || !validPassword) {
+      return res.status(500).json({
+        status: false,
+        message: 'Server configuration error: authentication credentials not configured',
+        errorcode: 'CONFIG_ERROR',
+      });
+    }
+
+    if (username.trim() !== validUsername || password !== validPassword) {
+      return res.status(401).json({
+        status: false,
+        message: 'Invalid username or password',
+        errorcode: 'UNAUTHORIZED',
+      });
+    }
+
+    // If username/password are valid, proceed with AngelOne login
     const loginRequest: LoginRequest = {
       clientcode,
-      password,
+      password: pin, // Use PIN as password for AngelOne API
       totp,
       ...(state && { state }),
     };
@@ -35,7 +64,10 @@ router.post('/login', async (req: Request, res: Response) => {
     const response = await angelOneService.login(loginRequest);
     res.json(response);
   } catch (error: any) {
-    const statusCode = error.errorcode === 'VALIDATION_ERROR' ? 400 : 500;
+    const statusCode = 
+      error.errorcode === 'VALIDATION_ERROR' ? 400 :
+      error.errorcode === 'UNAUTHORIZED' ? 401 :
+      error.errorcode === 'CONFIG_ERROR' ? 500 : 500;
     res.status(statusCode).json({
       status: false,
       message: error.message || 'Login failed',

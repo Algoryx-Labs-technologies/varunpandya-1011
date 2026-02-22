@@ -9,8 +9,10 @@ const DEFAULT_STATE = import.meta.env.VITE_ANGELONE_STATE || undefined
 console.log('API_BASE_URL configured as:', API_BASE_URL)
 
 export interface LoginRequest {
-  clientcode: string
+  username: string
   password: string
+  clientcode: string
+  pin: string
   totp: string
   state?: string
 }
@@ -35,19 +37,23 @@ export interface ApiError {
 }
 
 /**
- * Call AngelOne login API
+ * Call login API (validates username/password on server, then calls AngelOne)
  */
 export async function loginToAngelOne(credentials: {
-  clientcode: string
+  username: string
   password: string
+  clientcode: string
+  pin: string
   totp: string
   state?: string
 }): Promise<LoginResponse> {
   try {
     // Prepare request body with optional state from env
     const requestBody: LoginRequest = {
-      clientcode: credentials.clientcode,
+      username: credentials.username,
       password: credentials.password,
+      clientcode: credentials.clientcode,
+      pin: credentials.pin,
       totp: credentials.totp,
       ...(credentials.state || DEFAULT_STATE ? { state: credentials.state || DEFAULT_STATE } : {}),
     }
