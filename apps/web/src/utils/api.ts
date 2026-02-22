@@ -3,8 +3,10 @@
  * Handles API calls to the backend
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001'
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000'
 const DEFAULT_STATE = import.meta.env.VITE_ANGELONE_STATE || undefined
+
+console.log('API_BASE_URL configured as:', API_BASE_URL)
 
 export interface LoginRequest {
   clientcode: string
@@ -50,6 +52,9 @@ export async function loginToAngelOne(credentials: {
       ...(credentials.state || DEFAULT_STATE ? { state: credentials.state || DEFAULT_STATE } : {}),
     }
 
+    console.log('API Request URL:', `${API_BASE_URL}/api/auth/login`)
+    console.log('API Request Body:', requestBody)
+
     const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
       method: 'POST',
       headers: {
@@ -59,9 +64,23 @@ export async function loginToAngelOne(credentials: {
       body: JSON.stringify(requestBody),
     })
 
-    const data = await response.json()
+    console.log('API Response Status:', response.status, response.statusText)
 
-    if (!response.ok || !data.status) {
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ message: 'Failed to parse error response' }))
+      console.error('API Error Response:', errorData)
+      throw {
+        status: false,
+        message: errorData.message || 'Login failed',
+        errorcode: errorData.errorcode || 'HTTP_ERROR',
+        data: errorData.data,
+      } as ApiError
+    }
+
+    const data = await response.json()
+    console.log('API Success Response:', data)
+
+    if (!data.status) {
       throw {
         status: false,
         message: data.message || 'Login failed',
@@ -72,6 +91,7 @@ export async function loginToAngelOne(credentials: {
 
     return data as LoginResponse
   } catch (error: any) {
+    console.error('API Call Error:', error)
     if (error.status === false) {
       throw error
     }

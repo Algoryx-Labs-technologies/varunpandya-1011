@@ -23,11 +23,7 @@ export default function App() {
   }
 
   if (route === 'auth') {
-    return (
-      <div className="auth-page">
-        <Auth onNavigate={handleNavigate} />
-      </div>
-    )
+    return <Auth onNavigate={handleNavigate} />
   }
 
   return (

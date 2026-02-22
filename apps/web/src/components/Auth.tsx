@@ -18,51 +18,59 @@ export default function Auth({ onNavigate }: AuthProps) {
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showFields, setShowFields] = useState({
-    username: false,
     password: false,
     clientcode: false,
     pin: false,
     totp: false,
   })
 
-  const clearErrors = () => {
-    setErrors({})
-  }
-
   const showError = (field: string, message: string) => {
     setErrors((prev) => ({ ...prev, [field]: message }))
   }
 
   const validateForm = (): boolean => {
-    clearErrors()
+    // Clear previous errors first
+    setErrors({})
     let isValid = true
+    const newErrors: Record<string, string> = {}
 
     if (!formData.clientcode.trim()) {
-      showError('clientcode', 'Client code is required')
+      newErrors.clientcode = 'Client code is required'
       isValid = false
     }
 
     if (!formData.pin.trim()) {
-      showError('pin', 'PIN is required')
+      newErrors.pin = 'PIN is required'
       isValid = false
     }
 
     if (!formData.totp.trim()) {
-      showError('totp', 'TOTP is required')
+      newErrors.totp = 'TOTP is required'
       isValid = false
     } else if (!/^\d{6}$/.test(formData.totp.trim())) {
-      showError('totp', 'TOTP must be 6 digits')
+      newErrors.totp = 'TOTP must be 6 digits'
       isValid = false
     }
 
+    // Set all errors at once
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors)
+    }
+
+    console.log('Form validation result:', isValid, 'New errors:', newErrors)
     return isValid
   }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
     setFormData((prev) => ({ ...prev, [name]: value }))
+    // Clear error for this specific field when user starts typing
     if (errors[name]) {
-      clearErrors()
+      setErrors((prev) => {
+        const newErrors = { ...prev }
+        delete newErrors[name]
+        return newErrors
+      })
     }
   }
 
@@ -72,19 +80,37 @@ export default function Auth({ onNavigate }: AuthProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    console.log('=== FORM SUBMISSION START ===')
+    console.log('Form submitted with data:', formData)
 
-    if (!validateForm()) {
+    // Clear all previous errors first
+    setErrors({})
+    
+    const validationResult = validateForm()
+    console.log('Validation result:', validationResult)
+
+    if (!validationResult) {
+      console.log('❌ VALIDATION FAILED - API call will NOT be made')
+      console.log('Current form errors:', errors)
       return
     }
 
+    console.log('✅ VALIDATION PASSED - Proceeding with API call')
     setIsSubmitting(true)
 
     try {
-      const loginResponse = await loginToAngelOne({
+      const requestData = {
         clientcode: formData.clientcode.trim(),
         password: formData.pin.trim(),
         totp: formData.totp.trim(),
-      })
+      }
+      
+      console.log('📡 CALLING API with data:', requestData)
+      console.log('🌐 API URL:', `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000'}/api/auth/login`)
+
+      const loginResponse = await loginToAngelOne(requestData)
+
+      console.log('Login response:', loginResponse)
 
       if (loginResponse.status && loginResponse.data?.jwtToken) {
         saveAngelOneToken(loginResponse.data.jwtToken)
@@ -93,14 +119,17 @@ export default function Auth({ onNavigate }: AuthProps) {
         throw new Error(loginResponse.message || 'Failed to get AngelOne token')
       }
     } catch (error: any) {
+      console.error('Login error:', error)
       const errorMessage = error.message || 'Login failed. Please try again.'
-      if (error.message?.includes('clientcode') || error.errorcode?.includes('CLIENTCODE')) {
+      const errorCode = error.errorcode || ''
+      
+      if (errorMessage.toLowerCase().includes('clientcode') || errorCode.includes('CLIENTCODE')) {
         showError('clientcode', errorMessage)
         setFormData((prev) => ({ ...prev, clientcode: '' }))
-      } else if (error.message?.includes('PIN') || error.message?.includes('pin') || error.message?.includes('password') || error.errorcode?.includes('PASSWORD')) {
+      } else if (errorMessage.toLowerCase().includes('pin') || errorMessage.toLowerCase().includes('password') || errorCode.includes('PASSWORD')) {
         showError('pin', errorMessage)
         setFormData((prev) => ({ ...prev, pin: '' }))
-      } else if (error.message?.includes('TOTP') || error.message?.includes('totp') || error.errorcode?.includes('TOTP')) {
+      } else if (errorMessage.toLowerCase().includes('totp') || errorCode.includes('TOTP')) {
         showError('totp', errorMessage)
         setFormData((prev) => ({ ...prev, totp: '' }))
       } else {
@@ -127,7 +156,7 @@ export default function Auth({ onNavigate }: AuthProps) {
             <label htmlFor="auth-username" className="auth-label">Username</label>
             <div className="auth-input-wrapper">
               <input
-                type={showFields.username ? 'text' : 'password'}
+                type="text"
                 id="auth-username"
                 name="username"
                 className={`auth-input ${errors.username ? 'auth-input-error' : ''}`}
@@ -137,26 +166,6 @@ export default function Auth({ onNavigate }: AuthProps) {
                 autoComplete="username"
                 aria-required="true"
               />
-              <button
-                type="button"
-                className="auth-toggle-visibility"
-                onClick={() => toggleVisibility('username')}
-                aria-label="Toggle visibility"
-              >
-                <svg className="auth-eye-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  {showFields.username ? (
-                    <>
-                      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
-                      <line x1="1" y1="1" x2="23" y2="23"/>
-                    </>
-                  ) : (
-                    <>
-                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                      <circle cx="12" cy="12" r="3"/>
-                    </>
-                  )}
-                </svg>
-              </button>
             </div>
             {errors.username && <span className="auth-error" role="alert">{errors.username}</span>}
           </div>
