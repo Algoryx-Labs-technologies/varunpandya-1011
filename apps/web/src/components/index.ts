@@ -1,7 +1,10 @@
+// React components
+export { default as Sidebar } from './Sidebar'
+export { default as Header } from './Header'
+export { default as Dashboard } from './Dashboard'
+export { default as Trading } from './Trading'
+export { default as Auth } from './Auth'
+
+// Legacy exports for compatibility (if needed)
 export { renderOrderBookTable } from './orderBookTable'
 export { renderTradeBookTable } from './tradeBookTable'
-export { renderSidebar } from './sidebar'
-export { renderHeader, initHeader } from './header'
-export { renderDashboard, initDashboard } from './dashboard'
-export { renderTrading, initOrderTradeBookTabs, initTerminalTime } from './trading'
-export { renderAuth, initAuth } from './auth'

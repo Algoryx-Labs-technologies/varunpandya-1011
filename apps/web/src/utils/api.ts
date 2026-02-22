@@ -4,6 +4,7 @@
  */
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001'
+const DEFAULT_STATE = import.meta.env.VITE_ANGELONE_STATE || undefined
 
 export interface LoginRequest {
   clientcode: string
@@ -34,15 +35,28 @@ export interface ApiError {
 /**
  * Call AngelOne login API
  */
-export async function loginToAngelOne(credentials: LoginRequest): Promise<LoginResponse> {
+export async function loginToAngelOne(credentials: {
+  clientcode: string
+  password: string
+  totp: string
+  state?: string
+}): Promise<LoginResponse> {
   try {
+    // Prepare request body with optional state from env
+    const requestBody: LoginRequest = {
+      clientcode: credentials.clientcode,
+      password: credentials.password,
+      totp: credentials.totp,
+      ...(credentials.state || DEFAULT_STATE ? { state: credentials.state || DEFAULT_STATE } : {}),
+    }
+
     const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
       },
-      body: JSON.stringify(credentials),
+      body: JSON.stringify(requestBody),
     })
 
     const data = await response.json()
