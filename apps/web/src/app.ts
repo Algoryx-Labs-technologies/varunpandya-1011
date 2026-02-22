@@ -1,21 +1,25 @@
 import type { RouteKey } from './constants/routes'
-import { getCurrentRoute, navigateTo, protectRoute } from './router'
+import { getCurrentRoute, navigateTo } from './router'
+// TODO: Uncomment in future to enable authentication middleware
+// import { protectRoute } from './router'
 import { renderSidebar, renderHeader, renderDashboard, renderTrading, renderAuth, initDashboard, initOrderTradeBookTabs, initTerminalTime, initAuth, initHeader } from './components'
 import { initTradingViewChart } from './lib/tradingView'
-import { isAuthenticated } from './utils/auth'
+// TODO: Uncomment in future to enable authentication middleware
+// import { isAuthenticated } from './utils/auth'
 
 export function render() {
   let route = getCurrentRoute()
   
-  // Protect route - redirect to auth if not authenticated
-  route = protectRoute(route)
-  
-  // If redirected to auth, update URL
-  if (route === 'auth' && isAuthenticated() && window.location.pathname !== '/') {
-    // User is authenticated but somehow on auth page, redirect to dashboard
-    navigateTo('dashboard')
-    route = 'dashboard'
-  }
+  // TODO: Uncomment in future to enable authentication middleware
+  // // Protect route - redirect to auth if not authenticated
+  // route = protectRoute(route)
+  // 
+  // // If redirected to auth, update URL
+  // if (route === 'auth' && isAuthenticated() && window.location.pathname !== '/') {
+  //   // User is authenticated but somehow on auth page, redirect to dashboard
+  //   navigateTo('dashboard')
+  //   route = 'dashboard'
+  // }
   
   const app = document.querySelector<HTMLDivElement>('#app')!
   
