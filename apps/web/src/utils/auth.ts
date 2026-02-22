@@ -1,5 +1,6 @@
 const AUTH_STORAGE_KEY = 'algoryx_auth_token'
 const AUTH_TOKEN = 'authenticated'
+const ANGELONE_TOKEN_KEY = 'angle one token'
 
 /**
  * Get the username from environment variables
@@ -45,17 +46,40 @@ export function isAuthenticated(): boolean {
   return token === AUTH_TOKEN
 }
 
-/**
- * Logout user by clearing authentication token
- */
-export function logout(): void {
-  localStorage.removeItem(AUTH_STORAGE_KEY)
-}
 
 /**
  * Get authentication token (for future use if needed)
  */
 export function getAuthToken(): string | null {
   return localStorage.getItem(AUTH_STORAGE_KEY)
+}
+
+/**
+ * Save AngelOne JWT token to localStorage
+ */
+export function saveAngelOneToken(token: string): void {
+  localStorage.setItem(ANGELONE_TOKEN_KEY, token)
+}
+
+/**
+ * Get AngelOne JWT token from localStorage
+ */
+export function getAngelOneToken(): string | null {
+  return localStorage.getItem(ANGELONE_TOKEN_KEY)
+}
+
+/**
+ * Clear AngelOne token
+ */
+export function clearAngelOneToken(): void {
+  localStorage.removeItem(ANGELONE_TOKEN_KEY)
+}
+
+/**
+ * Logout user by clearing all authentication tokens
+ */
+export function logout(): void {
+  localStorage.removeItem(AUTH_STORAGE_KEY)
+  localStorage.removeItem(ANGELONE_TOKEN_KEY)
 }
 
