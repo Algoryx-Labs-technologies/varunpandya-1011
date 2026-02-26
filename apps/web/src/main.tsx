@@ -2,6 +2,7 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import './style.css'
 import App from './App'
+import { getCurrentRoute, protectRoute } from './router'
 
 function initApp() {
   const path = window.location.pathname.replace(/\/$/, '') || '/'
@@ -20,10 +21,20 @@ function initApp() {
       window.history.replaceState({}, '', '/profile')
     }
   } else if (path === '/') {
-    // Default to dashboard when auth is disabled
-    if (window.location.pathname !== '/Dashboard') {
-      window.history.replaceState({}, '', '/Dashboard')
+    // Default to auth page - middleware will handle redirect if authenticated
+    if (window.location.pathname !== '/') {
+      window.history.replaceState({}, '', '/')
     }
+  }
+  
+  // Apply route protection
+  const currentRoute = getCurrentRoute()
+  const protectedRoute = protectRoute(currentRoute)
+  
+  // Redirect if route was changed by protection
+  if (protectedRoute !== currentRoute) {
+    const authPath = protectedRoute === 'auth' ? '/' : `/${protectedRoute}`
+    window.history.replaceState({}, '', authPath)
   }
   
   const root = document.getElementById('app')

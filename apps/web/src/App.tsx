@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getCurrentRoute, navigateTo, type RouteKey } from './router'
+import { getCurrentRoute, navigateTo, protectRoute, type RouteKey } from './router'
 import Sidebar from './components/Sidebar'
 import Header from './components/Header'
 import Dashboard from './components/Dashboard'
@@ -8,7 +8,7 @@ import Auth from './components/Auth'
 import Profile from './components/Profile'
 
 export default function App() {
-  const [route, setRoute] = useState<RouteKey>(() => getCurrentRoute())
+  const [route, setRoute] = useState<RouteKey>(() => protectRoute(getCurrentRoute()))
 
   useEffect(() => {
     const handlePopState = () => {

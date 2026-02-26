@@ -126,7 +126,10 @@ export default function Auth({ onNavigate }: AuthProps) {
       console.log('Login response:', loginResponse)
 
       if (loginResponse.status && loginResponse.data?.jwtToken) {
+        // Save AngelOne token
         saveAngelOneToken(loginResponse.data.jwtToken)
+        // Set app authentication token to mark user as authenticated
+        localStorage.setItem('algoryx_auth_token', 'authenticated')
         onNavigate('dashboard')
       } else {
         throw new Error(loginResponse.message || 'Failed to get AngelOne token')

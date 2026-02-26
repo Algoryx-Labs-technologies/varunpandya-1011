@@ -21,13 +21,12 @@ export function requiresAuth(route: RouteKey): boolean {
  * Navigate to a route with authentication check
  */
 export function navigateTo(route: RouteKey) {
-  // TODO: Uncomment in future to enable authentication middleware
-  // // If route requires auth and user is not authenticated, redirect to auth
-  // if (requiresAuth(route) && !isAuthenticated()) {
-  //   const authPath = ROUTES.auth
-  //   window.history.pushState({}, '', authPath)
-  //   return
-  // }
+  // If route requires auth and user is not authenticated, redirect to auth
+  if (requiresAuth(route) && !isAuthenticated()) {
+    const authPath = ROUTES.auth
+    window.history.pushState({}, '', authPath)
+    return
+  }
 
   const path = ROUTES[route]
   window.history.pushState({}, '', path)
@@ -37,10 +36,9 @@ export function navigateTo(route: RouteKey) {
  * Protect route - redirect to auth if not authenticated
  */
 export function protectRoute(route: RouteKey): RouteKey {
-  // TODO: Uncomment in future to enable authentication middleware
-  // if (requiresAuth(route) && !isAuthenticated()) {
-  //   return 'auth'
-  // }
+  if (requiresAuth(route) && !isAuthenticated()) {
+    return 'auth'
+  }
   return route
 }
 
