@@ -1,7 +1,20 @@
+import {
+  getProfileApi,
+  getRMSLimitApi,
+  getHoldingApi,
+  getAllHoldingsApi,
+  getPositionApi,
+  convertPositionApi,
+  estimateBrokerageChargesApi,
+  calculateMarginApi,
+} from '../utils/api'
 import type {
   ProfileResponse,
   RMSLimitResponse,
   GetAllHoldingResponse,
+  GetPositionResponse,
+  PositionConversionRequest,
+  PositionConversionResponse,
   BrokerageEstimateResponse,
   BrokerageOrderInput,
   GainersLosersDataType,
@@ -14,69 +27,79 @@ import type {
 } from '../types/dashboard'
 import type { TradeBookItem } from '../types/tradeBook'
 
-/** Mock: Get Profile – replace with real API call */
+/** Normalize profile data (API may return arrays for exchanges/products) */
+function normalizeProfileData(d: { clientcode: string; name: string; email: string; mobileno: string; exchanges: string[] | string; products: string[] | string; lastlogintime: string; brokerid: string }) {
+  return {
+    clientcode: d.clientcode,
+    name: d.name,
+    email: d.email,
+    mobileno: d.mobileno,
+    exchanges: Array.isArray(d.exchanges) ? JSON.stringify(d.exchanges) : d.exchanges,
+    products: Array.isArray(d.products) ? JSON.stringify(d.products) : d.products,
+    lastlogintime: d.lastlogintime,
+    brokerid: d.brokerid,
+  }
+}
+
+/** Get Profile – real API */
 export function getProfile(): Promise<ProfileResponse> {
-  return Promise.resolve({
-    status: true,
-    message: 'SUCCESS',
-    errorcode: '',
-    data: {
-      clientcode: 'YOUR_CLIENT_CODE',
-      name: 'Varun',
-      email: 'varun@gmail.com',
-      mobileno: '',
-      exchanges: '["NSE","BSE","MCX","CDS","NCDEX","NFO"]',
-      products: '["DELIVERY","INTRADAY","MARGIN"]',
-      lastlogintime: '',
-      brokerid: 'B2C',
-    },
-  })
+  return getProfileApi().then((res) => ({
+    ...res,
+    data: normalizeProfileData(res.data),
+  }))
 }
 
-/** Mock: Get RMS Limit – replace with real API call */
+/** Get RMS Limit – real API */
 export function getRMSLimit(): Promise<RMSLimitResponse> {
-  return Promise.resolve({
-    status: true,
-    message: 'SUCCESS',
-    errorcode: '',
-    data: {
-      net: '234700',
-      availablecash: '230000',
-      availableintradaypayin: '0',
-      availablelimitmargin: '0',
-      collateral: '0',
-      m2munrealized: '0',
-      m2mrealized: '0',
-      utiliseddebits: '0',
-      utilisedspan: '0',
-      utilisedoptionpremium: '0',
-      utilisedholdingsales: '0',
-      utilisedexposure: '0',
-      utilisedturnover: '0',
-      utilisedpayout: '0',
-    },
-  })
+  return getRMSLimitApi().then((res) => ({
+    ...res,
+    data: Object.fromEntries(
+      Object.entries(res.data).map(([k, v]) => [k, typeof v === 'string' ? v : String(v)])
+    ) as RMSLimitResponse['data'],
+  }))
 }
 
-/** Mock: Get All Holding – replace with real API call */
+/** Get Holding (long-term equity delivery) – real API */
+export function getHolding(): Promise<{ status: boolean; message: string; errorcode: string; data: import('../types/dashboard').HoldingItem[] }> {
+  return getHoldingApi()
+}
+
+/** Get All Holding – real API */
 export function getAllHolding(): Promise<GetAllHoldingResponse> {
-  return Promise.resolve({
-    status: true,
-    message: 'SUCCESS',
-    errorcode: '',
-    data: {
-      holdings: [
-        { tradingsymbol: 'TATASTEEL-EQ', exchange: 'NSE', isin: 'INE081A01020', quantity: 2, product: 'DELIVERY', averageprice: 111.87, ltp: 130.15, symboltoken: '3499', close: 129.6, profitandloss: 37, pnlpercentage: 16.34 },
-        { tradingsymbol: 'PARAGMILK-EQ', exchange: 'NSE', isin: 'INE883N01014', quantity: 2, product: 'DELIVERY', averageprice: 154.03, ltp: 201, symboltoken: '17130', close: 192.1, profitandloss: 94, pnlpercentage: 30.49 },
-        { tradingsymbol: 'SBIN-EQ', exchange: 'NSE', isin: 'INE062A01020', quantity: 8, product: 'DELIVERY', averageprice: 573.1, ltp: 579.05, symboltoken: '3045', close: 570.5, profitandloss: 48, pnlpercentage: 1.04 },
-      ],
-      totalholding: {
-        totalholdingvalue: 5294,
-        totalinvvalue: 5116,
-        totalprofitandloss: 178.14,
-        totalpnlpercentage: 3.48,
-      },
-    },
+  return getAllHoldingsApi()
+}
+
+/** Normalize position response (API may return array or { net, day }) */
+function normalizePositionData(
+  data: GetPositionResponse['data'] | any[]
+): { net?: any[]; day?: any[] } {
+  if (Array.isArray(data)) return { net: data, day: [] }
+  if (data && typeof data === 'object' && ('net' in data || 'day' in data)) return data as { net?: any[]; day?: any[] }
+  return { net: [], day: [] }
+}
+
+/** Get Position (net + day) – real API */
+export function getPosition(): Promise<GetPositionResponse> {
+  return getPositionApi().then((res) => ({
+    ...res,
+    data: normalizePositionData(res.data),
+  }))
+}
+
+/** Convert Position – real API */
+export function convertPosition(req: PositionConversionRequest): Promise<PositionConversionResponse> {
+  return convertPositionApi({
+    ...req,
+    symbolname: req.symbolname ?? '',
+    instrumenttype: req.instrumenttype ?? '',
+    priceden: req.priceden ?? '1',
+    pricenum: req.pricenum ?? '1',
+    genden: req.genden ?? '1',
+    gennum: req.gennum ?? '1',
+    precision: req.precision ?? '2',
+    multiplier: req.multiplier ?? '-1',
+    boardlotsize: req.boardlotsize ?? '1',
+    type: req.type,
   })
 }
 
@@ -114,39 +137,27 @@ export function getCumulativePnLSeries(periodDays: number = 30): DailyPnLPoint[]
   return points
 }
 
-/** Estimate brokerage – replace with real POST to estimateCharges API */
+/** Estimate brokerage – real API */
 export function estimateCharges(orders: BrokerageOrderInput[]): Promise<BrokerageEstimateResponse> {
-  const tradeValue = orders.reduce((sum, o) => sum + Number(o.quantity) * Number(o.price), 0)
-  const totalCharges = tradeValue * 0.0002 + orders.length * 0.5
-  const res: BrokerageEstimateResponse = {
-    status: true,
-    message: 'SUCCESS',
-    errorcode: '',
-    data: {
-      summary: {
-        total_charges: Math.round(totalCharges * 100) / 100,
-        trade_value: tradeValue,
-        breakup: [
-          { name: 'Angel One Brokerage', amount: 0, msg: '', breakup: [] },
-          { name: 'External Charges', amount: Math.round(totalCharges * 0.9 * 100) / 100, msg: '', breakup: [
-            { name: 'Exchange Transaction Charges', amount: Math.round(totalCharges * 0.2 * 100) / 100, msg: '', breakup: [] },
-            { name: 'Stamp Duty', amount: Math.round(totalCharges * 0.5 * 100) / 100, msg: '', breakup: [] },
-            { name: 'SEBI Fees', amount: Math.round(totalCharges * 0.02 * 100) / 100, msg: '', breakup: [] },
-          ]},
-          { name: 'Taxes', amount: Math.round(totalCharges * 0.1 * 100) / 100, msg: '', breakup: [
-            { name: 'Security Transaction Tax', amount: 0, msg: '', breakup: [] },
-            { name: 'GST', amount: Math.round(totalCharges * 0.1 * 100) / 100, msg: '', breakup: [] },
-          ]},
-        ],
-      },
-      charges: orders.map(() => ({
-        total_charges: totalCharges / orders.length,
-        trade_value: tradeValue / orders.length,
-        breakup: [],
-      })),
-    },
-  }
-  return Promise.resolve(res)
+  return estimateBrokerageChargesApi(orders)
+}
+
+/** Calculate margin for a basket of positions – real API (max 50 positions) */
+export function calculateMargin(positions: {
+  exchange: string
+  qty: number
+  price: number
+  productType: string
+  token: string
+  tradeType: string
+  orderType?: string
+}[]): Promise<{
+  status: boolean
+  message: string
+  errorcode: string
+  data: { totalMarginRequired: number; marginComponents: Record<string, number> }
+}> {
+  return calculateMarginApi(positions)
 }
 
 /** Mock: Top Gainers/Losers – replace with POST to gainersLosers API */

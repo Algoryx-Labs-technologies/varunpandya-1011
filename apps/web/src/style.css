@@ -2120,6 +2120,108 @@ body {
   color: var(--text-muted);
 }
 
+/* Holdings, Positions, Convert Position row (below AI Score & P&L cards) */
+.dashboard-holdings-positions-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 20px;
+  padding: 0 32px 24px;
+}
+
+@media (max-width: 1200px) {
+  .dashboard-holdings-positions-row { grid-template-columns: 1fr; }
+}
+
+.holdings-summary {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 8px 0 12px;
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+}
+
+.holdings-summary .positive { color: var(--accent-green); }
+.holdings-summary .negative { color: var(--accent-red); }
+
+.holdings-row {
+  cursor: pointer;
+}
+
+.holdings-row:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.holding-detail {
+  margin-top: 12px;
+  padding: 12px;
+  background: var(--bg-card-elevated);
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.holding-detail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.holding-detail-header h4 {
+  margin: 0;
+  font-size: 0.9375rem;
+}
+
+.holding-detail-close {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 1.25rem;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0 4px;
+}
+
+.holding-detail-close:hover {
+  color: var(--text-primary);
+}
+
+.holding-detail-dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 16px;
+  margin: 0;
+  font-size: 0.8125rem;
+}
+
+.holding-detail-dl dt { color: var(--text-muted); }
+.holding-detail-dl dd { margin: 0; }
+.holding-detail-dl dd.positive { color: var(--accent-green); }
+.holding-detail-dl dd.negative { color: var(--accent-red); }
+
+.positions-tabs { padding-top: 4px; }
+.positions-subtitle {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin: 12px 0 6px;
+}
+
+.positions-subtitle:first-child { margin-top: 0; }
+
+.convert-position-desc {
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  margin: 0 0 12px;
+}
+
+.convert-position-form .brokerage-row { margin-bottom: 10px; }
+.convert-position-result {
+  margin-top: 12px;
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+}
+
 /* Market Data row: Top Gainers/Losers, PCR, OI Buildup */
 .dashboard-market-row {
   display: grid;
@@ -2320,6 +2422,41 @@ body {
 
 .brokerage-btn-calc:hover {
   filter: brightness(1.1);
+}
+
+.brokerage-btn-calc:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.margin-position-row {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.margin-position-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  min-width: 60px;
+}
+
+.margin-input-sm {
+  max-width: 80px;
+  padding: 6px 8px;
+  font-size: 0.8125rem;
+}
+
+.margin-remove-btn {
+  margin-top: 0;
+  padding: 6px 10px;
+  min-width: 32px;
+  background: var(--accent-red);
+}
+
+.margin-remove-btn:disabled {
+  opacity: 0.4;
 }
 
 .brokerage-result {

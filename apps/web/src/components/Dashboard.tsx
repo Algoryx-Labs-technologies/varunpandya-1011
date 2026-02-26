@@ -1,9 +1,9 @@
 import React, { useEffect, useState, useRef } from 'react'
 import { getGreeting, formatDateLong } from '../utils/format'
 import { getCumulativePnLSeries, type DailyPnLPoint } from '../data/dashboard'
-import { getProfile, getRMSLimit, getAllHolding, getTradeBook, getGainersLosers, getPutCallRatio, getOIBuildup, estimateCharges } from '../data/dashboard'
+import { getProfile, getRMSLimit, getAllHolding, getPosition, convertPosition, getTradeBook, getGainersLosers, getPutCallRatio, getOIBuildup, estimateCharges, calculateMargin } from '../data/dashboard'
 import type { TradeBookItem } from '../types/tradeBook'
-import type { GainersLosersItem, PCRItem, OIBuildupItem, GainersLosersDataType, GainersLosersExpiryType, OIBuildupDataType, OIBuildupExpiryType } from '../types/dashboard'
+import type { GainersLosersItem, PCRItem, OIBuildupItem, GainersLosersDataType, GainersLosersExpiryType, OIBuildupDataType, OIBuildupExpiryType, HoldingItem, TotalHolding, PositionItem } from '../types/dashboard'
 
 function svgPathFromSeries(points: DailyPnLPoint[], width: number, height: number, isCumulative: boolean): string {
   if (!points.length) return ''
@@ -95,6 +95,18 @@ export default function Dashboard() {
     price: '',
   })
   const [brokerageResult, setBrokerageResult] = useState<any>(null)
+  const [holdings, setHoldings] = useState<HoldingItem[]>([])
+  const [totalholding, setTotalholding] = useState<TotalHolding | null>(null)
+  const [selectedHolding, setSelectedHolding] = useState<HoldingItem | null>(null)
+  const [positionsNet, setPositionsNet] = useState<PositionItem[]>([])
+  const [positionsDay, setPositionsDay] = useState<PositionItem[]>([])
+  const [convertPositionSelected, setConvertPositionSelected] = useState<PositionItem | null>(null)
+  const [convertNewProduct, setConvertNewProduct] = useState<string>('INTRADAY')
+  const [convertResult, setConvertResult] = useState<string | null>(null)
+  const [marginPositions, setMarginPositions] = useState<{ exchange: string; qty: string; price: string; productType: string; token: string; tradeType: string }[]>([
+    { exchange: 'NSE', qty: '', price: '', productType: 'MARGIN', token: '', tradeType: 'BUY' },
+  ])
+  const [marginResult, setMarginResult] = useState<{ totalMarginRequired: number; marginComponents: Record<string, number> } | null>(null)
 
   useEffect(() => {
     const loadData = async () => {
@@ -114,6 +126,10 @@ export default function Dashboard() {
         if (holding?.data?.totalholding) {
           const th = holding.data.totalholding
           setNetPnL(th.totalprofitandloss)
+          setTotalholding(th)
+        }
+        if (holding?.data?.holdings) {
+          setHoldings(holding.data.holdings)
         }
         if (tradeBook?.data?.length) {
           const trades = tradeBook.data
@@ -171,6 +187,53 @@ export default function Dashboard() {
     loadOIBuildup()
   }, [oiBuildupDataType, oiBuildupExpiry])
 
+  useEffect(() => {
+    const loadPositions = async () => {
+      try {
+        const res = await getPosition()
+        if (res?.data?.net) setPositionsNet(res.data.net)
+        if (res?.data?.day) setPositionsDay(res.data.day)
+      } catch (error) {
+        console.error('Failed to load positions:', error)
+      }
+    }
+    loadPositions()
+  }, [])
+
+  const handleConvertPosition = async () => {
+    if (!convertPositionSelected) return
+    setConvertResult(null)
+    try {
+      const qty = Math.abs(Number(convertPositionSelected.netqty))
+      const res = await convertPosition({
+        exchange: convertPositionSelected.exchange,
+        symboltoken: convertPositionSelected.symboltoken,
+        oldproducttype: convertPositionSelected.producttype,
+        newproducttype: convertNewProduct,
+        tradingsymbol: convertPositionSelected.tradingsymbol,
+        symbolname: convertPositionSelected.symbolname,
+        instrumenttype: convertPositionSelected.instrumenttype ?? '',
+        priceden: convertPositionSelected.priceden ?? '1',
+        pricenum: convertPositionSelected.pricenum ?? '1',
+        genden: convertPositionSelected.genden ?? '1',
+        gennum: convertPositionSelected.gennum ?? '1',
+        precision: convertPositionSelected.precision ?? '2',
+        multiplier: convertPositionSelected.multiplier ?? '-1',
+        boardlotsize: convertPositionSelected.boardlotsize ?? '1',
+        buyqty: convertPositionSelected.buyqty,
+        sellqty: convertPositionSelected.sellqty,
+        buyamount: convertPositionSelected.buyamount,
+        sellamount: convertPositionSelected.sellamount,
+        transactiontype: Number(convertPositionSelected.netqty) >= 0 ? 'BUY' : 'SELL',
+        quantity: qty,
+        type: 'DAY',
+      })
+      setConvertResult(res.status ? 'Conversion successful.' : res.message)
+    } catch (error: any) {
+      setConvertResult(error?.message || 'Conversion failed.')
+    }
+  }
+
   const handleBrokerageCalc = async () => {
     if (!brokerageCalc.symbol || !brokerageCalc.token || !brokerageCalc.quantity || !brokerageCalc.price || Number(brokerageCalc.quantity) < 1 || Number(brokerageCalc.price) <= 0) {
       return
@@ -191,6 +254,47 @@ export default function Dashboard() {
     } catch (error) {
       console.error('Failed to calculate brokerage:', error)
     }
+  }
+
+  const handleMarginCalc = async () => {
+    const valid = marginPositions.filter(
+      (p) => p.token.trim() && Number(p.qty) > 0 && Number(p.price) > 0
+    )
+    if (valid.length === 0) return
+    if (valid.length > 50) {
+      setMarginResult(null)
+      return
+    }
+    setMarginResult(null)
+    try {
+      const res = await calculateMargin(
+        valid.map((p) => ({
+          exchange: p.exchange,
+          qty: Number(p.qty),
+          price: Number(p.price),
+          productType: p.productType,
+          token: p.token.trim(),
+          tradeType: p.tradeType,
+          orderType: 'LIMIT',
+        }))
+      )
+      if (res?.data) setMarginResult(res.data)
+    } catch (error) {
+      console.error('Failed to calculate margin:', error)
+    }
+  }
+
+  const addMarginPosition = () => {
+    if (marginPositions.length >= 50) return
+    setMarginPositions((prev) => [...prev, { exchange: 'NSE', qty: '', price: '', productType: 'MARGIN', token: '', tradeType: 'BUY' }])
+  }
+  const removeMarginPosition = (index: number) => {
+    setMarginPositions((prev) => prev.filter((_, i) => i !== index))
+    setMarginResult(null)
+  }
+  const updateMarginPosition = (index: number, field: string, value: string) => {
+    setMarginPositions((prev) => prev.map((p, i) => (i === index ? { ...p, [field]: value } : p)))
+    setMarginResult(null)
   }
 
   const chartW = 400
@@ -360,6 +464,189 @@ export default function Dashboard() {
                 <span>{series[series.length - 1].date.slice(5)}</span>
               </>
             ) : null}
+          </div>
+        </div>
+      </div>
+
+      <div className="dashboard-holdings-positions-row">
+        <div className="dashboard-card market-data-card">
+          <div className="dashboard-card-header">
+            <h3 className="dashboard-card-title">Get All Holdings</h3>
+          </div>
+          {totalholding && (
+            <div className="holdings-summary">
+              <span>Total value: ₹{totalholding.totalholdingvalue.toLocaleString('en-IN')}</span>
+              <span>Inv: ₹{totalholding.totalinvvalue.toLocaleString('en-IN')}</span>
+              <span className={totalholding.totalprofitandloss >= 0 ? 'positive' : 'negative'}>
+                P&L: ₹{totalholding.totalprofitandloss.toFixed(2)} ({totalholding.totalpnlpercentage}%)
+              </span>
+            </div>
+          )}
+          <div className="market-data-table-wrap">
+            <table className="market-data-table">
+              <thead>
+                <tr>
+                  <th className="market-data-th">Symbol</th>
+                  <th className="market-data-th">Qty</th>
+                  <th className="market-data-th">Avg</th>
+                  <th className="market-data-th">LTP</th>
+                  <th className="market-data-th">P&L</th>
+                  <th className="market-data-th">P&L %</th>
+                </tr>
+              </thead>
+              <tbody>
+                {holdings.map((h, i) => {
+                  const pnlClass = h.profitandloss >= 0 ? 'positive' : 'negative'
+                  return (
+                    <tr
+                      key={i}
+                      className="market-data-tr holdings-row"
+                      onClick={() => setSelectedHolding(h)}
+                    >
+                      <td className="market-data-td">{h.tradingsymbol}</td>
+                      <td className="market-data-td">{h.quantity}</td>
+                      <td className="market-data-td">₹{h.averageprice.toFixed(2)}</td>
+                      <td className="market-data-td">₹{h.ltp.toFixed(2)}</td>
+                      <td className={`market-data-td ${pnlClass}`}>₹{h.profitandloss.toFixed(2)}</td>
+                      <td className={`market-data-td ${pnlClass}`}>{h.pnlpercentage.toFixed(2)}%</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+          {selectedHolding && (
+            <div className="holding-detail" onClick={(e) => e.stopPropagation()}>
+              <div className="holding-detail-header">
+                <h4>Single Holding: {selectedHolding.tradingsymbol}</h4>
+                <button type="button" className="holding-detail-close" onClick={() => setSelectedHolding(null)}>×</button>
+              </div>
+              <dl className="holding-detail-dl">
+                <dt>Exchange</dt><dd>{selectedHolding.exchange}</dd>
+                <dt>ISIN</dt><dd>{selectedHolding.isin}</dd>
+                <dt>Quantity</dt><dd>{selectedHolding.quantity}</dd>
+                <dt>Product</dt><dd>{selectedHolding.product}</dd>
+                <dt>Avg Price</dt><dd>₹{selectedHolding.averageprice.toFixed(2)}</dd>
+                <dt>LTP</dt><dd>₹{selectedHolding.ltp.toFixed(2)}</dd>
+                <dt>Close</dt><dd>₹{selectedHolding.close?.toFixed(2) ?? '-'}</dd>
+                <dt>P&L</dt><dd className={selectedHolding.profitandloss >= 0 ? 'positive' : 'negative'}>₹{selectedHolding.profitandloss.toFixed(2)}</dd>
+                <dt>P&L %</dt><dd className={selectedHolding.pnlpercentage >= 0 ? 'positive' : 'negative'}>{selectedHolding.pnlpercentage.toFixed(2)}%</dd>
+              </dl>
+            </div>
+          )}
+        </div>
+
+        <div className="dashboard-card market-data-card">
+          <div className="dashboard-card-header">
+            <h3 className="dashboard-card-title">Get Position</h3>
+          </div>
+          <div className="positions-tabs">
+            <h4 className="positions-subtitle">Net (current portfolio)</h4>
+            <div className="market-data-table-wrap">
+              <table className="market-data-table">
+                <thead>
+                  <tr>
+                    <th className="market-data-th">Symbol</th>
+                    <th className="market-data-th">Product</th>
+                    <th className="market-data-th">Net Qty</th>
+                    <th className="market-data-th">Net Value</th>
+                    <th className="market-data-th">Net Price</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {positionsNet.map((p, i) => (
+                    <tr key={i} className="market-data-tr">
+                      <td className="market-data-td">{p.tradingsymbol}</td>
+                      <td className="market-data-td">{p.producttype}</td>
+                      <td className="market-data-td">{p.netqty}</td>
+                      <td className="market-data-td">{p.netvalue}</td>
+                      <td className="market-data-td">{p.netprice}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <h4 className="positions-subtitle">Day (today&apos;s activity)</h4>
+            <div className="market-data-table-wrap">
+              <table className="market-data-table">
+                <thead>
+                  <tr>
+                    <th className="market-data-th">Symbol</th>
+                    <th className="market-data-th">Product</th>
+                    <th className="market-data-th">Net Qty</th>
+                    <th className="market-data-th">Net Value</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {positionsDay.length === 0 ? (
+                    <tr><td className="market-data-td market-data-td-muted" colSpan={4}>No day positions</td></tr>
+                  ) : (
+                    positionsDay.map((p, i) => (
+                      <tr key={i} className="market-data-tr">
+                        <td className="market-data-td">{p.tradingsymbol}</td>
+                        <td className="market-data-td">{p.producttype}</td>
+                        <td className="market-data-td">{p.netqty}</td>
+                        <td className="market-data-td">{p.netvalue}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div className="dashboard-card market-data-card">
+          <div className="dashboard-card-header">
+            <h3 className="dashboard-card-title">Convert Position</h3>
+          </div>
+          <p className="convert-position-desc">Change a position&apos;s margin product (e.g. DELIVERY → INTRADAY).</p>
+          <div className="convert-position-form">
+            <div className="brokerage-row">
+              <label className="brokerage-label">Position</label>
+              <select
+                className="brokerage-input"
+                value={convertPositionSelected ? `${convertPositionSelected.symboltoken}-${convertPositionSelected.tradingsymbol}` : ''}
+                onChange={(e) => {
+                  const v = e.target.value
+                  if (!v) { setConvertPositionSelected(null); return }
+                  const pos = [...positionsNet, ...positionsDay].find(
+                    (p) => `${p.symboltoken}-${p.tradingsymbol}` === v
+                  )
+                  setConvertPositionSelected(pos ?? null)
+                }}
+                aria-label="Select position"
+              >
+                <option value="">Select position</option>
+                {[...positionsNet, ...positionsDay].map((p, i) => (
+                  <option key={i} value={`${p.symboltoken}-${p.tradingsymbol}`}>
+                    {p.tradingsymbol} ({p.producttype})
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="brokerage-row">
+              <label className="brokerage-label">New product type</label>
+              <select
+                className="brokerage-input"
+                value={convertNewProduct}
+                onChange={(e) => setConvertNewProduct(e.target.value)}
+                aria-label="New product"
+              >
+                <option value="DELIVERY">DELIVERY</option>
+                <option value="INTRADAY">INTRADAY</option>
+                <option value="MARGIN">MARGIN</option>
+              </select>
+            </div>
+            <button
+              type="button"
+              className="brokerage-btn-calc"
+              onClick={handleConvertPosition}
+              disabled={!convertPositionSelected}
+            >
+              Convert Position
+            </button>
+            {convertResult && <p className="convert-position-result">{convertResult}</p>}
           </div>
         </div>
       </div>
@@ -664,6 +951,117 @@ export default function Dashboard() {
                         </React.Fragment>
                       ))}
                   </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="dashboard-card dashboard-card-calculator">
+          <div className="dashboard-card-header">
+            <h3 className="dashboard-card-title">Margin Calculator</h3>
+          </div>
+          <p className="convert-position-desc">Calculate real-time margin for a basket (max 50 positions).</p>
+          <div className="brokerage-calc">
+            <div className="brokerage-form">
+              {marginPositions.map((pos, idx) => (
+                <div key={idx} className="brokerage-row margin-position-row">
+                  <span className="margin-position-label">Position {idx + 1}</span>
+                  <select
+                    className="brokerage-input margin-input-sm"
+                    value={pos.exchange}
+                    onChange={(e) => updateMarginPosition(idx, 'exchange', e.target.value)}
+                    aria-label="Exchange"
+                  >
+                    <option value="NSE">NSE</option>
+                    <option value="BSE">BSE</option>
+                    <option value="NFO">NFO</option>
+                    <option value="MCX">MCX</option>
+                  </select>
+                  <input
+                    type="text"
+                    className="brokerage-input margin-input-sm"
+                    placeholder="Token"
+                    value={pos.token}
+                    onChange={(e) => updateMarginPosition(idx, 'token', e.target.value)}
+                  />
+                  <select
+                    className="brokerage-input margin-input-sm"
+                    value={pos.productType}
+                    onChange={(e) => updateMarginPosition(idx, 'productType', e.target.value)}
+                    aria-label="Product"
+                  >
+                    <option value="DELIVERY">DELIVERY</option>
+                    <option value="INTRADAY">INTRADAY</option>
+                    <option value="MARGIN">MARGIN</option>
+                  </select>
+                  <select
+                    className="brokerage-input margin-input-sm"
+                    value={pos.tradeType}
+                    onChange={(e) => updateMarginPosition(idx, 'tradeType', e.target.value)}
+                    aria-label="Trade type"
+                  >
+                    <option value="BUY">BUY</option>
+                    <option value="SELL">SELL</option>
+                  </select>
+                  <input
+                    type="number"
+                    className="brokerage-input margin-input-sm"
+                    placeholder="Qty"
+                    min="1"
+                    value={pos.qty}
+                    onChange={(e) => updateMarginPosition(idx, 'qty', e.target.value)}
+                  />
+                  <input
+                    type="number"
+                    className="brokerage-input margin-input-sm"
+                    placeholder="Price"
+                    min="0"
+                    step="0.01"
+                    value={pos.price}
+                    onChange={(e) => updateMarginPosition(idx, 'price', e.target.value)}
+                  />
+                  <button
+                    type="button"
+                    className="brokerage-btn-calc margin-remove-btn"
+                    onClick={() => removeMarginPosition(idx)}
+                    aria-label="Remove position"
+                    disabled={marginPositions.length === 1}
+                  >
+                    −
+                  </button>
+                </div>
+              ))}
+              <div className="brokerage-row">
+                <button type="button" className="brokerage-btn-calc" onClick={addMarginPosition} disabled={marginPositions.length >= 50}>
+                  + Add Position
+                </button>
+                <button type="button" className="brokerage-btn-calc" onClick={handleMarginCalc}>
+                  Calculate Margin
+                </button>
+              </div>
+            </div>
+            <div className="brokerage-result">
+              {!marginResult ? (
+                <div className="brokerage-result-placeholder">
+                  Add positions and click Calculate Margin.
+                </div>
+              ) : (
+                <div className="brokerage-result-content">
+                  <div className="brokerage-total">
+                    <span>Total Margin Required</span>
+                    <strong>₹{marginResult.totalMarginRequired.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong>
+                  </div>
+                  {marginResult.marginComponents && Object.keys(marginResult.marginComponents).length > 0 && (
+                    <div className="brokerage-breakup">
+                      {Object.entries(marginResult.marginComponents).map(([name, amount]) => (
+                        <div key={name} className="brokerage-breakup-item">
+                          <span>{name}</span>
+                          <span>₹{Number(amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </div>

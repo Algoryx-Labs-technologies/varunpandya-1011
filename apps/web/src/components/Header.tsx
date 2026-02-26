@@ -1,12 +1,33 @@
 import type { RouteKey } from '../constants/routes'
-import { logout } from '../utils/auth'
+import { logout, getAngelOneToken } from '../utils/auth'
+import { getProfileApi, logoutApi } from '../utils/api'
 
 interface HeaderProps {
   onNavigate: (route: RouteKey) => void
 }
 
 export default function Header({ onNavigate }: HeaderProps) {
-  const handleLogout = () => {
+  const [profileName, setProfileName] = useState<string>('')
+
+  useEffect(() => {
+    const token = getAngelOneToken()
+    if (!token) return
+    getProfileApi()
+      .then((res) => res.data?.name && setProfileName(res.data.name))
+      .catch(() => {})
+  }, [])
+
+  const handleLogout = async () => {
+    const token = getAngelOneToken()
+    if (token) {
+      try {
+        const profile = await getProfileApi()
+        const clientcode = profile.data?.clientcode
+        if (clientcode) await logoutApi(clientcode)
+      } catch (_) {
+        // Proceed to clear local session even if API logout fails
+      }
+    }
     logout()
     onNavigate('auth')
   }
@@ -34,7 +55,7 @@ export default function Header({ onNavigate }: HeaderProps) {
         >
           <div className="header-avatar">A</div>
           <div className="header-user-info">
-            <div className="header-name">Varun Pandya 77929</div>
+            <div className="header-name">{profileName || 'User'}</div>
           </div>
         </button>
       </div>

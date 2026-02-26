@@ -97,18 +97,89 @@ export interface GetAllHoldingResponse {
   }
 }
 
-/** Get Position item */
+/** Get Position item (full API response shape) */
 export interface PositionItem {
   exchange: string
   symboltoken: string
   producttype: string
   tradingsymbol: string
   symbolname: string
-  netqty: string
-  netvalue: string
+  instrumenttype?: string
+  priceden?: string
+  pricenum?: string
+  genden?: string
+  gennum?: string
+  precision?: string
+  multiplier?: string
+  boardlotsize?: string
+  buyqty: string
+  sellqty: string
+  buyamount: string
+  sellamount: string
+  symbolgroup?: string
+  strikeprice?: string
+  optiontype?: string
+  expirydate?: string
+  lotsize?: string
+  cfbuyqty?: string
+  cfsellqty?: string
+  cfbuyamount?: string
+  cfsellamount?: string
   buyavgprice: string
   sellavgprice: string
+  avgnetprice?: string
+  netvalue: string
+  netqty: string
+  totalbuyvalue?: string
+  totalsellvalue?: string
+  cfbuyavgprice?: string
+  cfsellavgprice?: string
+  totalbuyavgprice?: string
+  totalsellavgprice?: string
   netprice: string
+}
+
+/** Get Position API returns net (current portfolio) and day (today's activity) */
+export interface GetPositionResponse {
+  status: boolean
+  message: string
+  errorcode: string
+  data: {
+    net?: PositionItem[]
+    day?: PositionItem[]
+  }
+}
+
+/** Position conversion request (change margin product) */
+export interface PositionConversionRequest {
+  exchange: string
+  symboltoken: string
+  oldproducttype: string
+  newproducttype: string
+  tradingsymbol: string
+  symbolname: string
+  instrumenttype?: string
+  priceden?: string
+  pricenum?: string
+  genden?: string
+  gennum?: string
+  precision?: string
+  multiplier?: string
+  boardlotsize?: string
+  buyqty: string
+  sellqty: string
+  buyamount: string
+  sellamount: string
+  transactiontype: string
+  quantity: number
+  type: 'DAY' | 'NET'
+}
+
+export interface PositionConversionResponse {
+  status: boolean
+  message: string
+  errorcode: string
+  data: null
 }
 
 /** Brokerage calculator */
