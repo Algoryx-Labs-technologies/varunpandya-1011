@@ -3,6 +3,9 @@
  * Handles API calls to the backend (AngelOne SmartAPI proxy)
  */
 import { getAngelOneToken } from './auth'
+import type { ProfileResponse } from '../types'
+
+export type { ProfileResponse }
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000'
 const DEFAULT_STATE = import.meta.env.VITE_ANGELONE_STATE || undefined
