@@ -22,15 +22,18 @@ import {
   MarginCalculatorRequest,
   MarginCalculatorResponse,
   ApiErrorResponse,
+  ApiType,
 } from '../types/angelone.types';
-import { angelOneConfig } from '../config/angelone.config';
+import { angelOneConfig, getApiKeyConfig } from '../config/angelone.config';
 
 export class AngelOneService {
   private axiosInstance: AxiosInstance;
   private baseUrl: string;
+  private currentApiType: ApiType;
 
-  constructor() {
+  constructor(apiType?: ApiType) {
     this.baseUrl = angelOneConfig.baseUrl;
+    this.currentApiType = apiType || angelOneConfig.defaultApiType || ApiType.TRADING;
     this.axiosInstance = axios.create({
       baseURL: this.baseUrl,
       timeout: 30000,
@@ -44,9 +47,26 @@ export class AngelOneService {
   }
 
   /**
+   * Set the API type for this service instance
+   */
+  setApiType(apiType: ApiType): void {
+    this.currentApiType = apiType;
+  }
+
+  /**
+   * Get current API type
+   */
+  getApiType(): ApiType {
+    return this.currentApiType;
+  }
+
+  /**
    * Get common headers for API requests
    */
-  private getHeaders(additionalHeaders?: Record<string, string>): Record<string, string> {
+  private getHeaders(additionalHeaders?: Record<string, string>, apiType?: ApiType): Record<string, string> {
+    const type = apiType || this.currentApiType;
+    const apiKeyConfig = getApiKeyConfig(type);
+    
     return {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
@@ -55,7 +75,7 @@ export class AngelOneService {
       'X-ClientLocalIP': angelOneConfig.clientLocalIP || '127.0.0.1',
       'X-ClientPublicIP': angelOneConfig.clientPublicIP || '',
       'X-MACAddress': angelOneConfig.macAddress || '',
-      'X-PrivateKey': angelOneConfig.apiKey,
+      'X-PrivateKey': apiKeyConfig.apiKey,
       ...additionalHeaders,
     };
   }

@@ -69,14 +69,38 @@ export interface ProfileResponse {
 }
 
 /**
+ * API Type Enum
+ */
+export enum ApiType {
+  TRADING = 'Trading',
+  PUBLISHER = 'Publisher',
+  HISTORICAL = 'Historical',
+  MARKET = 'Market',
+}
+
+/**
+ * API Key Configuration
+ */
+export interface ApiKeyConfig {
+  apiKey: string;
+  secretKey: string;
+}
+
+/**
  * AngelOne API Configuration
  */
 export interface AngelOneConfig {
-  apiKey: string;
+  apiKeys: {
+    trading: ApiKeyConfig;
+    publisher: ApiKeyConfig;
+    historical: ApiKeyConfig;
+    market: ApiKeyConfig;
+  };
   baseUrl: string;
   clientLocalIP?: string;
   clientPublicIP?: string;
   macAddress?: string;
+  defaultApiType?: ApiType;
 }
 
 /**

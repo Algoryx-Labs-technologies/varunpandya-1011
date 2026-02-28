@@ -11,12 +11,27 @@ npm install
 
 2. Configure environment variables:
    - Create a `.env` file in the `apps/api` directory
-   - Set the following required variables:
-     - `AUTH_USERNAME` - Username for application authentication
-     - `AUTH_PASSWORD` - Password for application authentication
-     - `ANGELONE_API_KEY` - Your AngelOne API key
-     - `PORT` - Server port (default: 3001)
-     - Other AngelOne configuration values (optional)
+   - Copy the template from `.env.example` (if available) or use the following variables:
+   
+   **Required Variables:**
+   - `AUTH_USERNAME` - Username for application authentication
+   - `AUTH_PASSWORD` - Password for application authentication
+   - `ANGELONE_TRADING_API_KEY` - API key for Trading app (varuntrade)
+   - `ANGELONE_TRADING_SECRET_KEY` - Secret key for Trading app (varuntrade)
+   - `ANGELONE_PUBLISHER_API_KEY` - API key for Publisher app
+   - `ANGELONE_PUBLISHER_SECRET_KEY` - Secret key for Publisher app
+   - `ANGELONE_HISTORICAL_API_KEY` - API key for Historical app
+   - `ANGELONE_HISTORICAL_SECRET_KEY` - Secret key for Historical app
+   - `ANGELONE_MARKET_API_KEY` - API key for Market app (marketFeed)
+   - `ANGELONE_MARKET_SECRET_KEY` - Secret key for Market app (marketFeed)
+   
+   **Optional Variables:**
+   - `PORT` - Server port (default: 3001)
+   - `ANGELONE_BASE_URL` - AngelOne API base URL (default: https://apiconnect.angelone.in)
+   - `ANGELONE_DEFAULT_API_TYPE` - Default API type to use: Trading, Publisher, Historical, or Market (default: Trading)
+   - `CLIENT_LOCAL_IP` - Client local IP address (default: 127.0.0.1)
+   - `CLIENT_PUBLIC_IP` - Client public IP address
+   - `MAC_ADDRESS` - MAC address
 
 ## Development
 
@@ -584,10 +599,75 @@ apps/api/
 
 ## Environment Variables
 
-- `ANGELONE_API_KEY` - Your AngelOne API key (required)
+### Required Variables
+
+**Application Authentication:**
+- `AUTH_USERNAME` - Username for application authentication
+- `AUTH_PASSWORD` - Password for application authentication
+
+**AngelOne API Keys - Trading (varuntrade):**
+- `ANGELONE_TRADING_API_KEY` - API key for Trading app (varuntrade)
+- `ANGELONE_TRADING_SECRET_KEY` - Secret key for Trading app (varuntrade)
+
+**AngelOne API Keys - Publisher:**
+- `ANGELONE_PUBLISHER_API_KEY` - API key for Publisher app
+- `ANGELONE_PUBLISHER_SECRET_KEY` - Secret key for Publisher app
+
+**AngelOne API Keys - Historical:**
+- `ANGELONE_HISTORICAL_API_KEY` - API key for Historical app
+- `ANGELONE_HISTORICAL_SECRET_KEY` - Secret key for Historical app
+
+**AngelOne API Keys - Market (marketFeed):**
+- `ANGELONE_MARKET_API_KEY` - API key for Market app (marketFeed)
+- `ANGELONE_MARKET_SECRET_KEY` - Secret key for Market app (marketFeed)
+
+### Optional Variables
+
+- `PORT` - Server port (default: 3001)
 - `ANGELONE_BASE_URL` - AngelOne API base URL (default: https://apiconnect.angelone.in)
-- `CLIENT_LOCAL_IP` - Client local IP address (optional)
+- `ANGELONE_DEFAULT_API_TYPE` - Default API type to use: Trading, Publisher, Historical, or Market (default: Trading)
+- `CLIENT_LOCAL_IP` - Client local IP address (default: 127.0.0.1)
 - `CLIENT_PUBLIC_IP` - Client public IP address (optional)
 - `MAC_ADDRESS` - MAC address (optional)
-- `PORT` - Server port (default: 3001)
+
+### Getting Your API Keys
+
+1. Log in to your AngelOne Smart APIs & Apps dashboard
+2. For each app (varuntrade, publisher, historical, marketFeed):
+   - Click the eye icon to reveal the API KEY
+   - Click the eye icon to reveal the SECRET KEY
+   - Copy both values to your `.env` file
+
+### Example .env File
+
+```env
+# Server Configuration
+PORT=3001
+
+# Application Authentication
+AUTH_USERNAME=your_app_username
+AUTH_PASSWORD=your_app_password
+
+# AngelOne API Base URL
+ANGELONE_BASE_URL=https://apiconnect.angelone.in
+
+# AngelOne API Keys - Trading (varuntrade)
+ANGELONE_TRADING_API_KEY=your_trading_api_key_here
+ANGELONE_TRADING_SECRET_KEY=your_trading_secret_key_here
+
+# AngelOne API Keys - Publisher
+ANGELONE_PUBLISHER_API_KEY=your_publisher_api_key_here
+ANGELONE_PUBLISHER_SECRET_KEY=your_publisher_secret_key_here
+
+# AngelOne API Keys - Historical
+ANGELONE_HISTORICAL_API_KEY=your_historical_api_key_here
+ANGELONE_HISTORICAL_SECRET_KEY=your_historical_secret_key_here
+
+# AngelOne API Keys - Market (marketFeed)
+ANGELONE_MARKET_API_KEY=your_market_api_key_here
+ANGELONE_MARKET_SECRET_KEY=your_market_secret_key_here
+
+# Default API Type (optional)
+ANGELONE_DEFAULT_API_TYPE=Trading
+```
 
