@@ -1,6 +1,7 @@
 const AUTH_STORAGE_KEY = 'algoryx_auth_token'
 const AUTH_TOKEN = 'authenticated'
 const ANGELONE_TOKEN_KEY = 'angle one token'
+const ANGELONE_REFRESH_TOKEN_KEY = 'angle one refresh token'
 
 /**
  * Get the username from environment variables
@@ -69,10 +70,25 @@ export function getAngelOneToken(): string | null {
 }
 
 /**
+ * Save AngelOne refresh token to localStorage
+ */
+export function saveAngelOneRefreshToken(token: string): void {
+  localStorage.setItem(ANGELONE_REFRESH_TOKEN_KEY, token)
+}
+
+/**
+ * Get AngelOne refresh token from localStorage
+ */
+export function getAngelOneRefreshToken(): string | null {
+  return localStorage.getItem(ANGELONE_REFRESH_TOKEN_KEY)
+}
+
+/**
  * Clear AngelOne token
  */
 export function clearAngelOneToken(): void {
   localStorage.removeItem(ANGELONE_TOKEN_KEY)
+  localStorage.removeItem(ANGELONE_REFRESH_TOKEN_KEY)
 }
 
 /**
@@ -81,5 +97,6 @@ export function clearAngelOneToken(): void {
 export function logout(): void {
   localStorage.removeItem(AUTH_STORAGE_KEY)
   localStorage.removeItem(ANGELONE_TOKEN_KEY)
+  localStorage.removeItem(ANGELONE_REFRESH_TOKEN_KEY)
 }
 

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react'
+import React, { useEffect, useState } from 'react'
 import { getGreeting, formatDateLong } from '../utils/format'
 import { getCumulativePnLSeries, type DailyPnLPoint } from '../data/dashboard'
 import { getProfile, getRMSLimit, getAllHolding, getPosition, convertPosition, getTradeBook, getOrderBook, getGainersLosers, getPutCallRatio, getOIBuildup, estimateCharges, calculateMargin } from '../data/dashboard'
@@ -67,7 +67,7 @@ export default function Dashboard() {
   const [todayPnL, setTodayPnL] = useState(0)
   const [todayTrades, setTodayTrades] = useState(0)
   const [todayWins, setTodayWins] = useState(0)
-  const [monthlyPnL, setMonthlyPnL] = useState(0)
+  const [monthlyPnL] = useState(0) // TODO: Calculate from historical data
   const [netPnL, setNetPnL] = useState(0)
   const [netPnLPercent, setNetPnLPercent] = useState(0)
   const [winRate, setWinRate] = useState(0)
@@ -111,11 +111,14 @@ export default function Dashboard() {
     { exchange: 'NSE', qty: '', price: '', productType: 'MARGIN', token: '', tradeType: 'BUY' },
   ])
   const [marginResult, setMarginResult] = useState<{ totalMarginRequired: number; marginComponents: Record<string, number> } | null>(null)
+  const [, setIsLoading] = useState(true) // Loading state for future use
+  const [hasInitialLoad, setHasInitialLoad] = useState(false)
 
   useEffect(() => {
     const loadData = async () => {
+      setIsLoading(true)
       try {
-        const [profile, rms, holding, tradeBookRes, orderBookRes] = await Promise.all([
+        const [profile, rms, holding, tradeBookRes, orderBookRes] = await Promise.allSettled([
           getProfile(),
           getRMSLimit(),
           getAllHolding(),
@@ -123,23 +126,26 @@ export default function Dashboard() {
           getOrderBook().catch(() => ({ status: true, data: [] })),
         ])
 
-        if (profile?.data?.name) setUserName(profile.data.name)
+        // Only update state if API calls succeeded - preserve existing state on errors
+        if (profile.status === 'fulfilled' && profile.value?.data?.name) {
+          setUserName(profile.value.data.name)
+        }
 
         // Account balance from RMS: availablecash or net
-        if (rms?.data) {
-          const cash = Number(rms.data.availablecash ?? rms.data.net ?? 0)
+        if (rms.status === 'fulfilled' && rms.value?.data) {
+          const cash = Number(rms.value.data.availablecash ?? rms.value.data.net ?? 0)
           setAccountBalance(cash)
         }
 
-        if (holding?.data?.totalholding) {
-          const th = holding.data.totalholding
+        if (holding.status === 'fulfilled' && holding.value?.data?.totalholding) {
+          const th = holding.value.data.totalholding
           setNetPnL(th.totalprofitandloss)
           setNetPnLPercent(th.totalpnlpercentage ?? 0)
           setTotalholding(th)
         }
 
-        if (holding?.data?.holdings?.length) {
-          const holdingsList = holding.data.holdings
+        if (holding.status === 'fulfilled' && holding.value?.data?.holdings?.length) {
+          const holdingsList = holding.value.data.holdings
           setHoldings(holdingsList)
           const total = holdingsList.length
           const wins = holdingsList.filter((h) => (h.profitandloss ?? 0) > 0).length
@@ -162,8 +168,8 @@ export default function Dashboard() {
           }
         }
 
-        if (tradeBookRes?.status && Array.isArray(tradeBookRes.data)) {
-          const trades = tradeBookRes.data
+        if (tradeBookRes.status === 'fulfilled' && tradeBookRes.value?.status && Array.isArray(tradeBookRes.value.data)) {
+          const trades = tradeBookRes.value.data
           setTradeBook(trades)
           setTodayTrades(trades.length)
           const wins = trades.filter((t) => Number(t.tradevalue) > 0 && t.transactiontype === 'SELL').length
@@ -172,11 +178,16 @@ export default function Dashboard() {
           setTodayPnL(todayPnL)
         }
 
-        if (orderBookRes?.status && Array.isArray(orderBookRes.data)) {
-          setOrderBook(orderBookRes.data)
+        if (orderBookRes.status === 'fulfilled' && orderBookRes.value?.status && Array.isArray(orderBookRes.value.data)) {
+          setOrderBook(orderBookRes.value.data)
         }
+
+        setHasInitialLoad(true)
       } catch (error) {
         console.error('Failed to load dashboard data:', error)
+        // Don't reset state on error - preserve existing data
+      } finally {
+        setIsLoading(false)
       }
     }
     loadData()
@@ -204,10 +215,13 @@ export default function Dashboard() {
         if (res?.data) setGainersLosersData(res.data)
       } catch (error) {
         console.error('Failed to load gainers/losers:', error)
+        // Preserve existing data on error
       }
     }
-    loadGainersLosers()
-  }, [gainersDataType, gainersExpiry])
+    if (hasInitialLoad) {
+      loadGainersLosers()
+    }
+  }, [gainersDataType, gainersExpiry, hasInitialLoad])
 
   useEffect(() => {
     const loadPCR = async () => {
@@ -216,10 +230,13 @@ export default function Dashboard() {
         if (res?.data) setPcrData(res.data)
       } catch (error) {
         console.error('Failed to load PCR:', error)
+        // Preserve existing data on error
       }
     }
-    loadPCR()
-  }, [])
+    if (hasInitialLoad) {
+      loadPCR()
+    }
+  }, [hasInitialLoad])
 
   useEffect(() => {
     const loadOIBuildup = async () => {
@@ -228,10 +245,13 @@ export default function Dashboard() {
         if (res?.data) setOiBuildupData(res.data)
       } catch (error) {
         console.error('Failed to load OI buildup:', error)
+        // Preserve existing data on error
       }
     }
-    loadOIBuildup()
-  }, [oiBuildupDataType, oiBuildupExpiry])
+    if (hasInitialLoad) {
+      loadOIBuildup()
+    }
+  }, [oiBuildupDataType, oiBuildupExpiry, hasInitialLoad])
 
   useEffect(() => {
     const loadPositions = async () => {
@@ -241,10 +261,13 @@ export default function Dashboard() {
         if (res?.data?.day) setPositionsDay(res.data.day)
       } catch (error) {
         console.error('Failed to load positions:', error)
+        // Preserve existing data on error
       }
     }
-    loadPositions()
-  }, [])
+    if (hasInitialLoad) {
+      loadPositions()
+    }
+  }, [hasInitialLoad])
 
   const handleConvertPosition = async () => {
     if (!convertPositionSelected) return

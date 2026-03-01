@@ -2,7 +2,7 @@
  * API Utility
  * Handles API calls to the backend (AngelOne SmartAPI proxy)
  */
-import { getAngelOneToken } from './auth'
+import { getAngelOneToken, getAngelOneRefreshToken, saveAngelOneToken, saveAngelOneRefreshToken } from './auth'
 import type { ProfileResponse } from '../types'
 
 export type { ProfileResponse }
@@ -64,6 +64,52 @@ async function parseResponse<T>(response: Response, data: any): Promise<T> {
     } as ApiError
   }
   return data as T
+}
+
+/** Make authenticated request with automatic token refresh on 401/500 */
+async function authenticatedFetch(
+  url: string,
+  options: RequestInit = {}
+): Promise<Response> {
+  const makeRequest = () => {
+    const headers = authHeaders()
+    return fetch(url, {
+      ...options,
+      headers: {
+        ...headers,
+        ...options.headers,
+      },
+    })
+  }
+
+  let response = await makeRequest()
+  
+  // If 401 or 500, try refreshing token once
+  if ((response.status === 401 || response.status === 500) && getAngelOneRefreshToken()) {
+    try {
+      const refreshToken = getAngelOneRefreshToken()
+      const currentToken = getAngelOneToken()
+      
+      if (refreshToken) {
+        const tokenResponse = await generateToken(refreshToken, currentToken || undefined)
+        
+        if (tokenResponse.status && tokenResponse.data) {
+          saveAngelOneToken(tokenResponse.data.jwtToken)
+          if (tokenResponse.data.refreshToken) {
+            saveAngelOneRefreshToken(tokenResponse.data.refreshToken)
+          }
+          
+          // Retry with new token
+          response = await makeRequest()
+        }
+      }
+    } catch (refreshError) {
+      // If refresh fails, return original response
+      console.error('Token refresh failed:', refreshError)
+    }
+  }
+  
+  return response
 }
 
 /**
@@ -216,7 +262,7 @@ export async function getProfileApi(): Promise<{
   errorcode: string
   data: { clientcode: string; name: string; email: string; mobileno: string; exchanges: string[]; products: string[]; lastlogintime: string; brokerid: string }
 }> {
-  const response = await fetch(`${API_BASE_URL}/api/auth/profile`, { method: 'GET', headers: authHeaders() })
+  const response = await authenticatedFetch(`${API_BASE_URL}/api/auth/profile`, { method: 'GET' })
   const data = await response.json()
   return parseResponse(response, data)
 }
@@ -230,7 +276,7 @@ export async function getRMSLimitApi(): Promise<{
   errorcode: string
   data: Record<string, string>
 }> {
-  const response = await fetch(`${API_BASE_URL}/api/auth/rms`, { method: 'GET', headers: authHeaders() })
+  const response = await authenticatedFetch(`${API_BASE_URL}/api/auth/rms`, { method: 'GET' })
   const data = await response.json()
   return parseResponse(response, data)
 }
@@ -239,9 +285,8 @@ export async function getRMSLimitApi(): Promise<{
  * POST /api/auth/logout – logout and invalidate session
  */
 export async function logoutApi(clientcode: string): Promise<{ status: boolean; message: string; errorcode: string; data: string }> {
-  const response = await fetch(`${API_BASE_URL}/api/auth/logout`, {
+  const response = await authenticatedFetch(`${API_BASE_URL}/api/auth/logout`, {
     method: 'POST',
-    headers: authHeaders(),
     body: JSON.stringify({ clientcode }),
   })
   const data = await response.json()
@@ -252,7 +297,7 @@ export async function logoutApi(clientcode: string): Promise<{ status: boolean; 
  * GET /api/portfolio/holding – get holding (long-term equity delivery)
  */
 export async function getHoldingApi(): Promise<{ status: boolean; message: string; errorcode: string; data: any[] }> {
-  const response = await fetch(`${API_BASE_URL}/api/portfolio/holding`, { method: 'GET', headers: authHeaders() })
+  const response = await authenticatedFetch(`${API_BASE_URL}/api/portfolio/holding`, { method: 'GET' })
   const data = await response.json()
   return parseResponse(response, data)
 }
@@ -266,7 +311,7 @@ export async function getAllHoldingsApi(): Promise<{
   errorcode: string
   data: { holdings: any[]; totalholding: { totalholdingvalue: number; totalinvvalue: number; totalprofitandloss: number; totalpnlpercentage: number } }
 }> {
-  const response = await fetch(`${API_BASE_URL}/api/portfolio/all-holdings`, { method: 'GET', headers: authHeaders() })
+  const response = await authenticatedFetch(`${API_BASE_URL}/api/portfolio/all-holdings`, { method: 'GET' })
   const data = await response.json()
   return parseResponse(response, data)
 }
@@ -280,7 +325,7 @@ export async function getPositionApi(): Promise<{
   errorcode: string
   data: { net?: any[]; day?: any[] } | any[]
 }> {
-  const response = await fetch(`${API_BASE_URL}/api/portfolio/position`, { method: 'GET', headers: authHeaders() })
+  const response = await authenticatedFetch(`${API_BASE_URL}/api/portfolio/position`, { method: 'GET' })
   const data = await response.json()
   return parseResponse(response, data)
 }
@@ -311,9 +356,8 @@ export async function convertPositionApi(body: {
   quantity: number
   type: string
 }): Promise<{ status: boolean; message: string; errorcode: string; data: null }> {
-  const response = await fetch(`${API_BASE_URL}/api/portfolio/convert-position`, {
+  const response = await authenticatedFetch(`${API_BASE_URL}/api/portfolio/convert-position`, {
     method: 'POST',
-    headers: authHeaders(),
     body: JSON.stringify(body),
   })
   const data = await response.json()
@@ -337,9 +381,8 @@ export async function estimateBrokerageChargesApi(orders: {
   errorcode: string
   data: { summary: { total_charges: number; trade_value: number; breakup: any[] }; charges: any[] }
 }> {
-  const response = await fetch(`${API_BASE_URL}/api/brokerage/estimate-charges`, {
+  const response = await authenticatedFetch(`${API_BASE_URL}/api/brokerage/estimate-charges`, {
     method: 'POST',
-    headers: authHeaders(),
     body: JSON.stringify({ orders }),
   })
   const data = await response.json()
@@ -363,9 +406,8 @@ export async function calculateMarginApi(positions: {
   errorcode: string
   data: { totalMarginRequired: number; marginComponents: Record<string, number> }
 }> {
-  const response = await fetch(`${API_BASE_URL}/api/margin/calculate`, {
+  const response = await authenticatedFetch(`${API_BASE_URL}/api/margin/calculate`, {
     method: 'POST',
-    headers: authHeaders(),
     body: JSON.stringify({ positions }),
   })
   const data = await response.json()
@@ -384,9 +426,8 @@ export async function getGainersLosersApi(body: {
   errorcode: string
   data: { tradingSymbol: string; percentChange: number; symbolToken: number; ltp: number; netChange: number }[]
 }> {
-  const response = await fetch(`${API_BASE_URL}/api/market-data/gainers-losers`, {
+  const response = await authenticatedFetch(`${API_BASE_URL}/api/market-data/gainers-losers`, {
     method: 'POST',
-    headers: authHeaders(),
     body: JSON.stringify(body),
   })
   const data = await response.json()
@@ -402,9 +443,8 @@ export async function getPutCallRatioApi(): Promise<{
   errorcode: string
   data: { pcr: number; tradingSymbol: string }[]
 }> {
-  const response = await fetch(`${API_BASE_URL}/api/market-data/put-call-ratio`, {
+  const response = await authenticatedFetch(`${API_BASE_URL}/api/market-data/put-call-ratio`, {
     method: 'GET',
-    headers: authHeaders(),
   })
   const data = await response.json()
   return parseResponse(response, data)
@@ -419,9 +459,8 @@ export async function getOrderBookApi(): Promise<{
   errorcode: string
   data: import('../types/orderBook').OrderBookItem[]
 }> {
-  const response = await fetch(`${API_BASE_URL}/api/order/order-book`, {
+  const response = await authenticatedFetch(`${API_BASE_URL}/api/order/order-book`, {
     method: 'GET',
-    headers: authHeaders(),
   })
   const data = await response.json()
   return parseResponse(response, data)
@@ -436,9 +475,8 @@ export async function getTradeBookApi(): Promise<{
   errorcode: string
   data: import('../types/tradeBook').TradeBookItem[]
 }> {
-  const response = await fetch(`${API_BASE_URL}/api/order/trade-book`, {
+  const response = await authenticatedFetch(`${API_BASE_URL}/api/order/trade-book`, {
     method: 'GET',
-    headers: authHeaders(),
   })
   const data = await response.json()
   return parseResponse(response, data)
@@ -456,9 +494,8 @@ export async function getOIBuildupApi(body: {
   errorcode: string
   data: { symbolToken: string; ltp: string; netChange: string; percentChange: string; opnInterest: string; netChangeOpnInterest: string; tradingSymbol: string }[]
 }> {
-  const response = await fetch(`${API_BASE_URL}/api/market-data/oi-buildup`, {
+  const response = await authenticatedFetch(`${API_BASE_URL}/api/market-data/oi-buildup`, {
     method: 'POST',
-    headers: authHeaders(),
     body: JSON.stringify(body),
   })
   const data = await response.json()

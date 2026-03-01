@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import type { RouteKey } from '../constants/routes'
 import { loginToAngelOne } from '../utils/api'
-import { saveAngelOneToken } from '../utils/auth'
+import { saveAngelOneToken, saveAngelOneRefreshToken } from '../utils/auth'
 
 interface AuthProps {
   onNavigate: (route: RouteKey) => void
@@ -126,8 +126,11 @@ export default function Auth({ onNavigate }: AuthProps) {
       console.log('Login response:', loginResponse)
 
       if (loginResponse.status && loginResponse.data?.jwtToken) {
-        // Save AngelOne token
+        // Save AngelOne token and refresh token
         saveAngelOneToken(loginResponse.data.jwtToken)
+        if (loginResponse.data.refreshToken) {
+          saveAngelOneRefreshToken(loginResponse.data.refreshToken)
+        }
         // Set app authentication token to mark user as authenticated
         localStorage.setItem('algoryx_auth_token', 'authenticated')
         onNavigate('dashboard')
