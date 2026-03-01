@@ -98,5 +98,6 @@ export function logout(): void {
   localStorage.removeItem(AUTH_STORAGE_KEY)
   localStorage.removeItem(ANGELONE_TOKEN_KEY)
   localStorage.removeItem(ANGELONE_REFRESH_TOKEN_KEY)
+  localStorage.removeItem('algoryx_user_name') // Clear cached user name
 }
 

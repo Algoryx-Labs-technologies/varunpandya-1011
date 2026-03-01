@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import { getGreeting, formatDateLong } from '../utils/format'
 import { getCumulativePnLSeries, type DailyPnLPoint } from '../data/dashboard'
 import { getProfile, getRMSLimit, getAllHolding, getPosition, convertPosition, getTradeBook, getOrderBook, getGainersLosers, getPutCallRatio, getOIBuildup, estimateCharges, calculateMargin } from '../data/dashboard'
@@ -62,8 +62,15 @@ function DailyCumulativeChart({ points, width, height }: { points: DailyPnLPoint
   )
 }
 
+// Cache key for storing user name in localStorage
+const USER_NAME_CACHE_KEY = 'algoryx_user_name'
+
 export default function Dashboard() {
-  const [userName, setUserName] = useState('Trader')
+  // Initialize userName from localStorage or default to 'Trader'
+  const [userName, setUserName] = useState(() => {
+    const cachedName = localStorage.getItem(USER_NAME_CACHE_KEY)
+    return cachedName || 'Trader'
+  })
   const [todayPnL, setTodayPnL] = useState(0)
   const [todayTrades, setTodayTrades] = useState(0)
   const [todayWins, setTodayWins] = useState(0)
@@ -113,8 +120,52 @@ export default function Dashboard() {
   const [marginResult, setMarginResult] = useState<{ totalMarginRequired: number; marginComponents: Record<string, number> } | null>(null)
   const [, setIsLoading] = useState(true) // Loading state for future use
   const [hasInitialLoad, setHasInitialLoad] = useState(false)
+  const isMountedRef = useRef(true)
+  const loadDataRef = useRef<Promise<void> | null>(null)
 
   useEffect(() => {
+    isMountedRef.current = true
+    return () => {
+      isMountedRef.current = false
+    }
+  }, [])
+
+  // Separate effect to load profile name - runs independently
+  useEffect(() => {
+    let cancelled = false
+    
+    const loadProfile = async () => {
+      try {
+        const profileRes = await getProfile()
+        if (!cancelled && isMountedRef.current && profileRes?.status && profileRes?.data?.name) {
+          const name = profileRes.data.name.trim()
+          if (name) {
+            // Update state and cache in localStorage
+            setUserName(name)
+            localStorage.setItem(USER_NAME_CACHE_KEY, name)
+            console.log('Profile name loaded and cached:', name)
+          }
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.error('Failed to load profile:', error)
+          // On error, keep the cached name if available
+        }
+      }
+    }
+    
+    loadProfile()
+    return () => {
+      cancelled = true
+    }
+  }, []) // Run once on mount
+
+  useEffect(() => {
+    // Prevent duplicate calls in React.StrictMode
+    if (loadDataRef.current) {
+      return
+    }
+
     const loadData = async () => {
       setIsLoading(true)
       try {
@@ -126,9 +177,20 @@ export default function Dashboard() {
           getOrderBook().catch(() => ({ status: true, data: [] })),
         ])
 
-        // Only update state if API calls succeeded - preserve existing state on errors
-        if (profile.status === 'fulfilled' && profile.value?.data?.name) {
-          setUserName(profile.value.data.name)
+        // Only update state if component is still mounted
+        if (!isMountedRef.current) return
+
+        // Update profile name if not already set (fallback)
+        if (profile.status === 'fulfilled') {
+          const profileData = profile.value
+          if (profileData?.status && profileData?.data?.name) {
+            const name = profileData.data.name.trim()
+            if (name && isMountedRef.current) {
+              setUserName(name)
+              // Also cache it
+              localStorage.setItem(USER_NAME_CACHE_KEY, name)
+            }
+          }
         }
 
         // Account balance from RMS: availablecash or net
@@ -187,10 +249,14 @@ export default function Dashboard() {
         console.error('Failed to load dashboard data:', error)
         // Don't reset state on error - preserve existing data
       } finally {
-        setIsLoading(false)
+        if (isMountedRef.current) {
+          setIsLoading(false)
+        }
+        loadDataRef.current = null
       }
     }
-    loadData()
+    
+    loadDataRef.current = loadData()
   }, [])
 
   useEffect(() => {
@@ -209,63 +275,99 @@ export default function Dashboard() {
   }, [period, totalholding])
 
   useEffect(() => {
+    if (!hasInitialLoad || !isMountedRef.current) return
+
+    let cancelled = false
     const loadGainersLosers = async () => {
       try {
         const res = await getGainersLosers(gainersDataType, gainersExpiry)
-        if (res?.data) setGainersLosersData(res.data)
+        if (!cancelled && isMountedRef.current && res?.data) {
+          setGainersLosersData(res.data)
+        }
       } catch (error) {
-        console.error('Failed to load gainers/losers:', error)
+        if (!cancelled) {
+          console.error('Failed to load gainers/losers:', error)
+        }
         // Preserve existing data on error
       }
     }
-    if (hasInitialLoad) {
-      loadGainersLosers()
+    
+    loadGainersLosers()
+    return () => {
+      cancelled = true
     }
   }, [gainersDataType, gainersExpiry, hasInitialLoad])
 
   useEffect(() => {
+    if (!hasInitialLoad || !isMountedRef.current) return
+
+    let cancelled = false
     const loadPCR = async () => {
       try {
         const res = await getPutCallRatio()
-        if (res?.data) setPcrData(res.data)
+        if (!cancelled && isMountedRef.current && res?.data) {
+          setPcrData(res.data)
+        }
       } catch (error) {
-        console.error('Failed to load PCR:', error)
+        if (!cancelled) {
+          console.error('Failed to load PCR:', error)
+        }
         // Preserve existing data on error
       }
     }
-    if (hasInitialLoad) {
-      loadPCR()
+    
+    loadPCR()
+    return () => {
+      cancelled = true
     }
   }, [hasInitialLoad])
 
   useEffect(() => {
+    if (!hasInitialLoad || !isMountedRef.current) return
+
+    let cancelled = false
     const loadOIBuildup = async () => {
       try {
         const res = await getOIBuildup(oiBuildupExpiry, oiBuildupDataType)
-        if (res?.data) setOiBuildupData(res.data)
+        if (!cancelled && isMountedRef.current && res?.data) {
+          setOiBuildupData(res.data)
+        }
       } catch (error) {
-        console.error('Failed to load OI buildup:', error)
+        if (!cancelled) {
+          console.error('Failed to load OI buildup:', error)
+        }
         // Preserve existing data on error
       }
     }
-    if (hasInitialLoad) {
-      loadOIBuildup()
+    
+    loadOIBuildup()
+    return () => {
+      cancelled = true
     }
   }, [oiBuildupDataType, oiBuildupExpiry, hasInitialLoad])
 
   useEffect(() => {
+    if (!hasInitialLoad || !isMountedRef.current) return
+
+    let cancelled = false
     const loadPositions = async () => {
       try {
         const res = await getPosition()
-        if (res?.data?.net) setPositionsNet(res.data.net)
-        if (res?.data?.day) setPositionsDay(res.data.day)
+        if (!cancelled && isMountedRef.current) {
+          if (res?.data?.net) setPositionsNet(res.data.net)
+          if (res?.data?.day) setPositionsDay(res.data.day)
+        }
       } catch (error) {
-        console.error('Failed to load positions:', error)
+        if (!cancelled) {
+          console.error('Failed to load positions:', error)
+        }
         // Preserve existing data on error
       }
     }
-    if (hasInitialLoad) {
-      loadPositions()
+    
+    loadPositions()
+    return () => {
+      cancelled = true
     }
   }, [hasInitialLoad])
 

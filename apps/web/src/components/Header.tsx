@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import type { RouteKey } from '../constants/routes'
 import { logout, getAngelOneToken } from '../utils/auth'
 import { getProfileApi, logoutApi } from '../utils/api'
@@ -7,15 +7,65 @@ interface HeaderProps {
   onNavigate: (route: RouteKey) => void
 }
 
+// Cache key for storing user name in localStorage (same as Dashboard)
+const USER_NAME_CACHE_KEY = 'algoryx_user_name'
+
+// Extract first name from full name
+function getFirstName(fullName: string): string {
+  if (!fullName) return 'User'
+  const parts = fullName.trim().split(' ')
+  return parts[0] || 'User'
+}
+
 export default function Header({ onNavigate }: HeaderProps) {
-  const [profileName, setProfileName] = useState<string>('')
+  // Initialize from localStorage cache
+  const [profileName, setProfileName] = useState<string>(() => {
+    const cachedName = localStorage.getItem(USER_NAME_CACHE_KEY)
+    return cachedName ? getFirstName(cachedName) : 'User'
+  })
+  const isMountedRef = useRef(true)
 
   useEffect(() => {
+    isMountedRef.current = true
+    return () => {
+      isMountedRef.current = false
+    }
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
     const token = getAngelOneToken()
     if (!token) return
-    getProfileApi()
-      .then((res) => res.data?.name && setProfileName(res.data.name))
-      .catch(() => {})
+
+    const loadProfile = async () => {
+      try {
+        const res = await getProfileApi()
+        if (!cancelled && isMountedRef.current && res?.data?.name) {
+          const fullName = res.data.name.trim()
+          if (fullName) {
+            // Update localStorage cache
+            localStorage.setItem(USER_NAME_CACHE_KEY, fullName)
+            // Display first name in header
+            const firstName = getFirstName(fullName)
+            setProfileName(firstName)
+          }
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.error('Failed to load profile in Header:', error)
+          // Keep cached name if available
+          const cachedName = localStorage.getItem(USER_NAME_CACHE_KEY)
+          if (cachedName && isMountedRef.current) {
+            setProfileName(getFirstName(cachedName))
+          }
+        }
+      }
+    }
+
+    loadProfile()
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   const handleLogout = async () => {

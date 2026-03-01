@@ -40,6 +40,12 @@ export interface ApiError {
   data?: any
 }
 
+// Token refresh lock to prevent multiple simultaneous refresh attempts
+let tokenRefreshPromise: Promise<boolean> | null = null
+
+// Request deduplication cache - stores in-flight requests
+const requestCache = new Map<string, Promise<Response>>()
+
 /** Build headers for authenticated requests */
 function authHeaders(): Record<string, string> {
   const token = getAngelOneToken()
@@ -66,12 +72,64 @@ async function parseResponse<T>(response: Response, data: any): Promise<T> {
   return data as T
 }
 
-/** Make authenticated request with automatic token refresh on 401/500 */
+/** Refresh token with lock to prevent concurrent refresh attempts */
+async function refreshTokenIfNeeded(): Promise<boolean> {
+  // If a refresh is already in progress, wait for it
+  if (tokenRefreshPromise) {
+    return tokenRefreshPromise
+  }
+
+  // Start new refresh
+  tokenRefreshPromise = (async () => {
+    try {
+      const refreshToken = getAngelOneRefreshToken()
+      const currentToken = getAngelOneToken()
+      
+      if (!refreshToken) {
+        console.warn('No refresh token available')
+        return false
+      }
+
+      const tokenResponse = await generateToken(refreshToken, currentToken || undefined)
+      
+      if (tokenResponse.status && tokenResponse.data) {
+        saveAngelOneToken(tokenResponse.data.jwtToken)
+        if (tokenResponse.data.refreshToken) {
+          saveAngelOneRefreshToken(tokenResponse.data.refreshToken)
+        }
+        // Small delay to ensure token is saved
+        await new Promise(resolve => setTimeout(resolve, 50))
+        return true
+      }
+      
+      return false
+    } catch (error) {
+      console.error('Token refresh failed:', error)
+      return false
+    } finally {
+      // Clear the lock after refresh completes
+      tokenRefreshPromise = null
+    }
+  })()
+
+  return tokenRefreshPromise
+}
+
+/** Make authenticated request with automatic token refresh on 401 */
 async function authenticatedFetch(
   url: string,
   options: RequestInit = {}
 ): Promise<Response> {
-  const makeRequest = () => {
+  // Create cache key for request deduplication (only for GET requests)
+  const isGet = !options.method || options.method === 'GET'
+  const cacheKey = isGet ? `${url}:${JSON.stringify(options)}` : null
+  
+  // Check if same request is already in flight
+  if (cacheKey && requestCache.has(cacheKey)) {
+    return requestCache.get(cacheKey)!
+  }
+
+  const makeRequest = async (): Promise<Response> => {
     const headers = authHeaders()
     return fetch(url, {
       ...options,
@@ -82,34 +140,53 @@ async function authenticatedFetch(
     })
   }
 
-  let response = await makeRequest()
-  
-  // If 401 or 500, try refreshing token once
-  if ((response.status === 401 || response.status === 500) && getAngelOneRefreshToken()) {
-    try {
-      const refreshToken = getAngelOneRefreshToken()
-      const currentToken = getAngelOneToken()
+  const executeRequest = async (): Promise<Response> => {
+    let response = await makeRequest()
+    
+    // Only refresh on 401 (Unauthorized) - check 500 errors for auth issues
+    if (response.status === 401 && getAngelOneRefreshToken()) {
+      const refreshSuccess = await refreshTokenIfNeeded()
       
-      if (refreshToken) {
-        const tokenResponse = await generateToken(refreshToken, currentToken || undefined)
-        
-        if (tokenResponse.status && tokenResponse.data) {
-          saveAngelOneToken(tokenResponse.data.jwtToken)
-          if (tokenResponse.data.refreshToken) {
-            saveAngelOneRefreshToken(tokenResponse.data.refreshToken)
-          }
-          
-          // Retry with new token
-          response = await makeRequest()
-        }
+      if (refreshSuccess) {
+        // Retry with new token
+        response = await makeRequest()
       }
-    } catch (refreshError) {
-      // If refresh fails, return original response
-      console.error('Token refresh failed:', refreshError)
+    } else if (response.status === 500 && getAngelOneRefreshToken()) {
+      // For 500 errors, check if it's auth-related before refreshing
+      try {
+        const clonedResponse = response.clone()
+        const errorData = await clonedResponse.json().catch(() => null)
+        const isAuthError = errorData?.errorcode === 'UNAUTHORIZED' || 
+                           errorData?.message?.toLowerCase().includes('token') ||
+                           errorData?.message?.toLowerCase().includes('unauthorized') ||
+                           errorData?.message?.toLowerCase().includes('expired')
+        
+        if (isAuthError) {
+          const refreshSuccess = await refreshTokenIfNeeded()
+          if (refreshSuccess) {
+            response = await makeRequest()
+          }
+        }
+      } catch (parseError) {
+        // If we can't parse, don't refresh on 500
+      }
     }
+    
+    return response
+  }
+
+  const requestPromise = executeRequest()
+  
+  // Cache GET requests to prevent duplicates
+  if (cacheKey) {
+    requestCache.set(cacheKey, requestPromise)
+    // Remove from cache after request completes (success or failure)
+    requestPromise.finally(() => {
+      requestCache.delete(cacheKey)
+    })
   }
   
-  return response
+  return requestPromise
 }
 
 /**
