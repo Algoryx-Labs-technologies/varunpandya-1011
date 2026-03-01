@@ -3,6 +3,7 @@
  * Main entry point for the API service
  */
 import express, { Express, Request, Response } from 'express';
+import { createServer } from 'http';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import authRoutes from './routes/auth.routes';
@@ -13,10 +14,12 @@ import marketDataRoutes from './routes/marketData.routes';
 import orderRoutes from './routes/order.routes';
 import { validateConfig } from './config/angelone.config';
 import { requestLogger } from './middleware/requestLogger';
+import { setupWebSocketServer } from './routes/websocket.routes';
 
 dotenv.config();
 
 const app: Express = express();
+const httpServer = createServer(app);
 const PORT = process.env.PORT || 3001;
 
 // Middleware
@@ -67,7 +70,10 @@ async function startServer() {
     // Validate configuration
     validateConfig();
 
-    app.listen(PORT, () => {
+    // Setup WebSocket server
+    setupWebSocketServer(httpServer);
+
+    httpServer.listen(PORT, () => {
       console.log(`🚀 API server running on port ${PORT}`);
       console.log(`📡 Health check: http://localhost:${PORT}/health`);
       console.log(`🔐 Auth endpoints: http://localhost:${PORT}/api/auth`);
@@ -76,6 +82,7 @@ async function startServer() {
       console.log(`💵 Margin endpoints: http://localhost:${PORT}/api/margin`);
       console.log(`📈 Market data endpoints: http://localhost:${PORT}/api/market-data`);
       console.log(`📋 Order endpoints: http://localhost:${PORT}/api/order`);
+      console.log(`🔌 WebSocket endpoint: ws://localhost:${PORT}/api/order/websocket`);
     });
   } catch (error: any) {
     console.error('Failed to start server:', error.message);

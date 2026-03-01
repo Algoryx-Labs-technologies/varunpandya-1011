@@ -1,10 +1,11 @@
 import React, { useEffect, useState, useRef } from 'react'
 import { getGreeting, formatDateLong } from '../utils/format'
-import { getCumulativePnLSeries, type DailyPnLPoint } from '../data/dashboard'
+import type { DailyPnLPoint } from '../data/dashboard'
 import { getProfile, getRMSLimit, getAllHolding, getPosition, convertPosition, getTradeBook, getOrderBook, getGainersLosers, getPutCallRatio, getOIBuildup, estimateCharges, calculateMargin } from '../data/dashboard'
 import type { OrderBookItem } from '../types/orderBook'
 import type { TradeBookItem } from '../types/tradeBook'
 import type { GainersLosersItem, PCRItem, OIBuildupItem, GainersLosersDataType, GainersLosersExpiryType, OIBuildupDataType, OIBuildupExpiryType, HoldingItem, TotalHolding, PositionItem } from '../types/dashboard'
+import OrderStatusWidget from './OrderStatusWidget'
 
 function svgPathFromSeries(points: DailyPnLPoint[], width: number, height: number, isCumulative: boolean): string {
   if (!points.length) return ''
@@ -74,7 +75,7 @@ export default function Dashboard() {
   const [todayPnL, setTodayPnL] = useState(0)
   const [todayTrades, setTodayTrades] = useState(0)
   const [todayWins, setTodayWins] = useState(0)
-  const [monthlyPnL] = useState(0) // TODO: Calculate from historical data
+  const [monthlyPnL, setMonthlyPnL] = useState(0)
   const [netPnL, setNetPnL] = useState(0)
   const [netPnLPercent, setNetPnLPercent] = useState(0)
   const [winRate, setWinRate] = useState(0)
@@ -238,6 +239,18 @@ export default function Dashboard() {
           setTodayWins(wins)
           const todayPnL = trades.reduce((sum, t) => sum + Number(t.tradevalue) * (t.transactiontype === 'SELL' ? 1 : -1), 0)
           setTodayPnL(todayPnL)
+          
+          // Calculate monthly P&L from trades in current month
+          const now = new Date()
+          const currentMonth = now.getMonth()
+          const currentYear = now.getFullYear()
+          const monthlyTrades = trades.filter((t) => {
+            if (!t.filltime) return false
+            const tradeDate = new Date(t.filltime)
+            return tradeDate.getMonth() === currentMonth && tradeDate.getFullYear() === currentYear
+          })
+          const monthlyPnLValue = monthlyTrades.reduce((sum, t) => sum + Number(t.tradevalue) * (t.transactiontype === 'SELL' ? 1 : -1), 0)
+          setMonthlyPnL(monthlyPnLValue)
         }
 
         if (orderBookRes.status === 'fulfilled' && orderBookRes.value?.status && Array.isArray(orderBookRes.value.data)) {
@@ -259,20 +272,70 @@ export default function Dashboard() {
     loadDataRef.current = loadData()
   }, [])
 
+  // Build P&L series from trade book data
   useEffect(() => {
-    if (totalholding != null) {
-      const end = new Date()
-      const start = new Date(end)
-      start.setDate(start.getDate() - period)
-      const totalPnL = totalholding.totalprofitandloss
-      setPnlSeries([
-        { date: start.toISOString().slice(0, 10), dailyPnL: 0, cumulativePnL: 0 },
-        { date: end.toISOString().slice(0, 10), dailyPnL: totalPnL, cumulativePnL: totalPnL },
-      ])
-    } else {
-      setPnlSeries(getCumulativePnLSeries(period))
+    if (tradeBook.length === 0) {
+      // No trade data - show empty series or use totalholding if available
+      if (totalholding != null) {
+        const end = new Date()
+        const start = new Date(end)
+        start.setDate(start.getDate() - period)
+        const totalPnL = totalholding.totalprofitandloss
+        // Show simple two-point series: start at 0, end at total P&L
+        setPnlSeries([
+          { date: start.toISOString().slice(0, 10), dailyPnL: 0, cumulativePnL: 0 },
+          { date: end.toISOString().slice(0, 10), dailyPnL: totalPnL, cumulativePnL: totalPnL },
+        ])
+      } else {
+        setPnlSeries([])
+      }
+      return
     }
-  }, [period, totalholding])
+
+    const end = new Date()
+    const start = new Date(end)
+    start.setDate(start.getDate() - period)
+    
+    // Group trades by date and calculate daily P&L
+    const tradesByDate = new Map<string, number>()
+    
+    tradeBook.forEach((trade) => {
+      if (!trade.filltime) return
+      try {
+        const tradeDate = new Date(trade.filltime)
+        const dateStr = tradeDate.toISOString().slice(0, 10)
+        const dateObj = new Date(dateStr)
+        
+        // Only include trades within the period
+        if (dateObj >= start && dateObj <= end) {
+          const pnl = Number(trade.tradevalue) * (trade.transactiontype === 'SELL' ? 1 : -1)
+          tradesByDate.set(dateStr, (tradesByDate.get(dateStr) || 0) + pnl)
+        }
+      } catch (e) {
+        // Skip invalid dates
+        console.warn('Invalid trade date:', trade.filltime)
+      }
+    })
+
+    // Build series with all days in period
+    const series: DailyPnLPoint[] = []
+    let cumulativePnL = 0
+
+    for (let i = 0; i < period; i++) {
+      const date = new Date(start)
+      date.setDate(date.getDate() + i)
+      const dateStr = date.toISOString().slice(0, 10)
+      const dailyPnL = tradesByDate.get(dateStr) || 0
+      cumulativePnL += dailyPnL
+      series.push({
+        date: dateStr,
+        dailyPnL,
+        cumulativePnL,
+      })
+    }
+
+    setPnlSeries(series)
+  }, [period, totalholding, tradeBook])
 
   useEffect(() => {
     if (!hasInitialLoad || !isMountedRef.current) return
@@ -470,7 +533,7 @@ export default function Dashboard() {
 
   const chartW = 400
   const chartH = 140
-  const series = pnlSeries.length ? pnlSeries : getCumulativePnLSeries(30)
+  const series = pnlSeries.length > 0 ? pnlSeries : []
 
   const todayPnLClass = todayPnL >= 0 ? 'positive' : 'negative'
   const monthlyPnLClass = monthlyPnL >= 0 ? 'positive' : 'negative'
@@ -555,7 +618,11 @@ export default function Dashboard() {
             {netPnLPercent >= 0 ? '+' : ''}{netPnLPercent}% return
           </div>
           <div className="dashboard-kpi-sparkline">
-            <CumulativeChart points={series.slice(-14)} width={120} height={36} />
+            {series.length > 0 ? (
+              <CumulativeChart points={series.slice(-14)} width={120} height={36} />
+            ) : (
+              <div style={{ width: 120, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)', fontSize: '10px' }}>No data</div>
+            )}
           </div>
         </div>
         <div className="dashboard-kpi-card">
@@ -584,7 +651,11 @@ export default function Dashboard() {
           </div>
           <div className="dashboard-kpi-sub">Current balance</div>
           <div className="dashboard-kpi-sparkline">
-            <CumulativeChart points={series.slice(-14)} width={120} height={36} />
+            {series.length > 0 ? (
+              <CumulativeChart points={series.slice(-14)} width={120} height={36} />
+            ) : (
+              <div style={{ width: 120, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)', fontSize: '10px' }}>No data</div>
+            )}
           </div>
         </div>
         <div className="dashboard-kpi-card">
@@ -600,15 +671,25 @@ export default function Dashboard() {
       <div className="dashboard-charts-row">
         <div className="dashboard-card dashboard-card-score">
           <div className="dashboard-card-header">
-            <h3 className="dashboard-card-title">AI Performance Score</h3>
+            <h3 className="dashboard-card-title">Performance Score</h3>
           </div>
           <div className="dashboard-radar-wrap">
             <div className="dashboard-radar-placeholder">
-              <span className="dashboard-ai-score-label">AI Score</span>
-              <span className="dashboard-ai-score-value">N/A</span>
+              <span className="dashboard-ai-score-label">Score</span>
+              <span className="dashboard-ai-score-value">
+                {totalTrades > 0 ? Math.round(winRate * (profitFactor != null && profitFactor > 0 ? Math.min(profitFactor, 2) : 1) / 2) : 0}
+              </span>
             </div>
             <div className="dashboard-score-bar">
-              <div className="dashboard-score-fill" style={{ width: '0%' }}></div>
+              <div 
+                className="dashboard-score-fill" 
+                style={{ 
+                  width: `${totalTrades > 0 ? Math.min(Math.round(winRate * (profitFactor != null && profitFactor > 0 ? Math.min(profitFactor, 2) : 1) / 2), 100) : 0}%` 
+                }}
+              ></div>
+            </div>
+            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '8px', textAlign: 'center' }}>
+              Based on Win Rate & Profit Factor
             </div>
           </div>
         </div>
@@ -617,15 +698,21 @@ export default function Dashboard() {
             <h3 className="dashboard-card-title">Net Cumulative P&L</h3>
           </div>
           <div className="dashboard-chart-wrap">
-            <CumulativeChart points={series} width={chartW} height={chartH} />
+            {series.length > 0 ? (
+              <CumulativeChart points={series} width={chartW} height={chartH} />
+            ) : (
+              <div style={{ width: chartW, height: chartH, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)' }}>No data available</div>
+            )}
           </div>
           <div className="dashboard-chart-labels">
-            {series.length ? (
+            {series.length > 0 ? (
               <>
                 <span>{series[0].date}</span>
                 <span>{series[series.length - 1].date}</span>
               </>
-            ) : null}
+            ) : (
+              <span>No data</span>
+            )}
           </div>
         </div>
         <div className="dashboard-card dashboard-card-chart">
@@ -633,15 +720,21 @@ export default function Dashboard() {
             <h3 className="dashboard-card-title">Daily & Cumulative Net P&L</h3>
           </div>
           <div className="dashboard-chart-wrap">
-            <DailyCumulativeChart points={series} width={chartW} height={chartH} />
+            {series.length > 0 ? (
+              <DailyCumulativeChart points={series} width={chartW} height={chartH} />
+            ) : (
+              <div style={{ width: chartW, height: chartH, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)' }}>No data available</div>
+            )}
           </div>
           <div className="dashboard-chart-labels">
-            {series.length ? (
+            {series.length > 0 ? (
               <>
                 <span>{series[0].date.slice(5)}</span>
                 <span>{series[series.length - 1].date.slice(5)}</span>
               </>
-            ) : null}
+            ) : (
+              <span>No data</span>
+            )}
           </div>
         </div>
       </div>
@@ -989,6 +1082,8 @@ export default function Dashboard() {
       </div>
 
       <div className="dashboard-bottom-row">
+        <OrderStatusWidget />
+
         <div className="dashboard-card dashboard-card-wide">
           <div className="dashboard-card-header">
             <h3 className="dashboard-card-title">Order Book</h3>
