@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useRef } from 'react'
 import { getGreeting, formatDateLong } from '../utils/format'
 import { getCumulativePnLSeries, type DailyPnLPoint } from '../data/dashboard'
-import { getProfile, getRMSLimit, getAllHolding, getPosition, convertPosition, getTradeBook, getGainersLosers, getPutCallRatio, getOIBuildup, estimateCharges, calculateMargin } from '../data/dashboard'
+import { getProfile, getRMSLimit, getAllHolding, getPosition, convertPosition, getTradeBook, getOrderBook, getGainersLosers, getPutCallRatio, getOIBuildup, estimateCharges, calculateMargin } from '../data/dashboard'
+import type { OrderBookItem } from '../types/orderBook'
 import type { TradeBookItem } from '../types/tradeBook'
 import type { GainersLosersItem, PCRItem, OIBuildupItem, GainersLosersDataType, GainersLosersExpiryType, OIBuildupDataType, OIBuildupExpiryType, HoldingItem, TotalHolding, PositionItem } from '../types/dashboard'
 
@@ -63,19 +64,22 @@ function DailyCumulativeChart({ points, width, height }: { points: DailyPnLPoint
 
 export default function Dashboard() {
   const [userName, setUserName] = useState('Trader')
-  const [todayPnL, setTodayPnL] = useState(-1099)
-  const [todayTrades, setTodayTrades] = useState(3)
-  const [todayWins, setTodayWins] = useState(2)
-  const [monthlyPnL, setMonthlyPnL] = useState(2345)
-  const [netPnL, setNetPnL] = useState(7958)
-  const [netPnLPercent, setNetPnLPercent] = useState(2.4)
-  const [winRate, setWinRate] = useState(44.6)
-  const [totalTrades, setTotalTrades] = useState(83)
-  const [profitFactor, setProfitFactor] = useState(1.33)
-  const [accountBalance, setAccountBalance] = useState(234700)
-  const [riskRewardStr, setRiskRewardStr] = useState('1:1.65')
+  const [todayPnL, setTodayPnL] = useState(0)
+  const [todayTrades, setTodayTrades] = useState(0)
+  const [todayWins, setTodayWins] = useState(0)
+  const [monthlyPnL, setMonthlyPnL] = useState(0)
+  const [netPnL, setNetPnL] = useState(0)
+  const [netPnLPercent, setNetPnLPercent] = useState(0)
+  const [winRate, setWinRate] = useState(0)
+  const [totalTrades, setTotalTrades] = useState(0)
+  const [profitFactor, setProfitFactor] = useState<number | null>(null)
+  const [accountBalance, setAccountBalance] = useState(0)
+  const [riskRewardStr, setRiskRewardStr] = useState('—')
+  const [totalGains, setTotalGains] = useState(0)
+  const [totalLosses, setTotalLosses] = useState(0)
   const [pnlSeries, setPnlSeries] = useState<DailyPnLPoint[]>([])
-  const [recentTrades, setRecentTrades] = useState<TradeBookItem[]>([])
+  const [orderBook, setOrderBook] = useState<OrderBookItem[]>([])
+  const [tradeBook, setTradeBook] = useState<TradeBookItem[]>([])
   const [period, setPeriod] = useState(30)
   const [activeTab, setActiveTab] = useState<'live' | 'prop'>('live')
   const [gainersLosersData, setGainersLosersData] = useState<GainersLosersItem[]>([])
@@ -111,34 +115,65 @@ export default function Dashboard() {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [profile, rms, holding, tradeBook] = await Promise.all([
+        const [profile, rms, holding, tradeBookRes, orderBookRes] = await Promise.all([
           getProfile(),
           getRMSLimit(),
           getAllHolding(),
-          getTradeBook(),
+          getTradeBook().catch(() => ({ status: true, data: [] })),
+          getOrderBook().catch(() => ({ status: true, data: [] })),
         ])
 
         if (profile?.data?.name) setUserName(profile.data.name)
-        if (rms?.data?.net) {
-          const net = Number(rms.data.net)
-          setAccountBalance(net)
+
+        // Account balance from RMS: availablecash or net
+        if (rms?.data) {
+          const cash = Number(rms.data.availablecash ?? rms.data.net ?? 0)
+          setAccountBalance(cash)
         }
+
         if (holding?.data?.totalholding) {
           const th = holding.data.totalholding
           setNetPnL(th.totalprofitandloss)
+          setNetPnLPercent(th.totalpnlpercentage ?? 0)
           setTotalholding(th)
         }
-        if (holding?.data?.holdings) {
-          setHoldings(holding.data.holdings)
+
+        if (holding?.data?.holdings?.length) {
+          const holdingsList = holding.data.holdings
+          setHoldings(holdingsList)
+          const total = holdingsList.length
+          const wins = holdingsList.filter((h) => (h.profitandloss ?? 0) > 0).length
+          setTotalTrades(total)
+          setWinRate(total ? (wins / total) * 100 : 0)
+          const gains = holdingsList.filter((h) => (h.profitandloss ?? 0) > 0).reduce((s, h) => s + (h.profitandloss ?? 0), 0)
+          const losses = Math.abs(holdingsList.filter((h) => (h.profitandloss ?? 0) < 0).reduce((s, h) => s + (h.profitandloss ?? 0), 0))
+          setTotalGains(gains)
+          setTotalLosses(losses)
+          if (losses > 0) {
+            setProfitFactor(gains / losses)
+          } else {
+            setProfitFactor(gains > 0 ? null : 0) // null = "—" when no losses but have gains
+          }
+          if (losses > 0 && gains > 0) {
+            const rr = (gains / losses).toFixed(2)
+            setRiskRewardStr(`1:${rr}`)
+          } else {
+            setRiskRewardStr('—')
+          }
         }
-        if (tradeBook?.data?.length) {
-          const trades = tradeBook.data
+
+        if (tradeBookRes?.status && Array.isArray(tradeBookRes.data)) {
+          const trades = tradeBookRes.data
+          setTradeBook(trades)
           setTodayTrades(trades.length)
           const wins = trades.filter((t) => Number(t.tradevalue) > 0 && t.transactiontype === 'SELL').length
           setTodayWins(wins)
           const todayPnL = trades.reduce((sum, t) => sum + Number(t.tradevalue) * (t.transactiontype === 'SELL' ? 1 : -1), 0)
           setTodayPnL(todayPnL)
-          setRecentTrades(trades.slice(0, 10))
+        }
+
+        if (orderBookRes?.status && Array.isArray(orderBookRes.data)) {
+          setOrderBook(orderBookRes.data)
         }
       } catch (error) {
         console.error('Failed to load dashboard data:', error)
@@ -148,8 +183,19 @@ export default function Dashboard() {
   }, [])
 
   useEffect(() => {
-    setPnlSeries(getCumulativePnLSeries(period))
-  }, [period])
+    if (totalholding != null) {
+      const end = new Date()
+      const start = new Date(end)
+      start.setDate(start.getDate() - period)
+      const totalPnL = totalholding.totalprofitandloss
+      setPnlSeries([
+        { date: start.toISOString().slice(0, 10), dailyPnL: 0, cumulativePnL: 0 },
+        { date: end.toISOString().slice(0, 10), dailyPnL: totalPnL, cumulativePnL: totalPnL },
+      ])
+    } else {
+      setPnlSeries(getCumulativePnLSeries(period))
+    }
+  }, [period, totalholding])
 
   useEffect(() => {
     const loadGainersLosers = async () => {
@@ -380,7 +426,9 @@ export default function Dashboard() {
           <div className={`dashboard-kpi-value ${netPnLClass}`}>
             ₹{netPnL.toLocaleString('en-IN')}
           </div>
-          <div className={`dashboard-kpi-sub ${netPnLClass}`}>+{netPnLPercent}% return</div>
+          <div className={`dashboard-kpi-sub ${netPnLClass}`}>
+            {netPnLPercent >= 0 ? '+' : ''}{netPnLPercent}% return
+          </div>
           <div className="dashboard-kpi-sparkline">
             <CumulativeChart points={series.slice(-14)} width={120} height={36} />
           </div>
@@ -397,13 +445,17 @@ export default function Dashboard() {
         </div>
         <div className="dashboard-kpi-card">
           <div className="dashboard-kpi-label">Profit Factor</div>
-          <div className="dashboard-kpi-value">{profitFactor}</div>
-          <div className="dashboard-kpi-sub">Even</div>
+          <div className="dashboard-kpi-value">
+            {profitFactor == null ? '—' : profitFactor === 0 ? '0' : profitFactor.toFixed(2)}
+          </div>
+          <div className="dashboard-kpi-sub">
+            {profitFactor != null && profitFactor > 0 ? (profitFactor > 1 ? 'Favourable' : 'Even') : '—'}
+          </div>
         </div>
         <div className="dashboard-kpi-card">
           <div className="dashboard-kpi-label">Account Balance</div>
           <div className="dashboard-kpi-value">
-            ₹{(accountBalance / 1000).toFixed(1)}K
+            ₹{accountBalance >= 1000 ? (accountBalance / 1000).toFixed(1) + 'K' : accountBalance.toLocaleString('en-IN')}
           </div>
           <div className="dashboard-kpi-sub">Current balance</div>
           <div className="dashboard-kpi-sparkline">
@@ -414,7 +466,8 @@ export default function Dashboard() {
           <div className="dashboard-kpi-label">Risk : Reward</div>
           <div className="dashboard-kpi-value">{riskRewardStr}</div>
           <div className="dashboard-kpi-sub">
-            <span className="positive">+4078</span> <span className="negative">-1631</span>
+            <span className="positive">+{totalGains.toFixed(0)}</span>{' '}
+            <span className="negative">-{totalLosses.toFixed(0)}</span>
           </div>
         </div>
       </div>
@@ -427,10 +480,10 @@ export default function Dashboard() {
           <div className="dashboard-radar-wrap">
             <div className="dashboard-radar-placeholder">
               <span className="dashboard-ai-score-label">AI Score</span>
-              <span className="dashboard-ai-score-value">33.77</span>
+              <span className="dashboard-ai-score-value">N/A</span>
             </div>
             <div className="dashboard-score-bar">
-              <div className="dashboard-score-fill" style={{ width: '34%' }}></div>
+              <div className="dashboard-score-fill" style={{ width: '0%' }}></div>
             </div>
           </div>
         </div>
@@ -685,7 +738,8 @@ export default function Dashboard() {
                 <tr>
                   <th className="market-data-th">Symbol</th>
                   <th className="market-data-th">% Chg</th>
-                  <th className="market-data-th">OI</th>
+                  <th className="market-data-th">LTP</th>
+                  <th className="market-data-th">Net Chg</th>
                 </tr>
               </thead>
               <tbody>
@@ -693,13 +747,17 @@ export default function Dashboard() {
                   const pct = r.percentChange
                   const pctClass = pct >= 0 ? 'positive' : 'negative'
                   const pctStr = (pct >= 0 ? '+' : '') + pct.toFixed(2) + '%'
+                  const netChg = r.netChange
+                  const netChgClass = netChg >= 0 ? 'positive' : 'negative'
+                  const netChgStr = (netChg >= 0 ? '+' : '') + Number(netChg).toLocaleString('en-IN', { maximumFractionDigits: 2 })
                   return (
                     <tr key={i} className="market-data-tr">
                       <td className="market-data-td">{r.tradingSymbol}</td>
                       <td className={`market-data-td ${pctClass}`}>{pctStr}</td>
                       <td className="market-data-td market-data-td-muted">
-                        {Number(r.opnInterest).toLocaleString('en-IN')}
+                        {Number(r.ltp).toLocaleString('en-IN', { maximumFractionDigits: 2 })}
                       </td>
+                      <td className={`market-data-td ${netChgClass}`}>{netChgStr}</td>
                     </tr>
                   )
                 })}
@@ -720,12 +778,20 @@ export default function Dashboard() {
                 </tr>
               </thead>
               <tbody>
-                {pcrData.slice(0, 12).map((r, i) => (
-                  <tr key={i} className="market-data-tr">
-                    <td className="market-data-td">{r.tradingSymbol}</td>
-                    <td className="market-data-td market-data-pcr">{r.pcr.toFixed(2)}</td>
+                {pcrData.length === 0 ? (
+                  <tr className="market-data-tr">
+                    <td colSpan={2} className="market-data-td market-data-td-muted" style={{ textAlign: 'center' }}>
+                      No data
+                    </td>
                   </tr>
-                ))}
+                ) : (
+                  pcrData.slice(0, 12).map((r, i) => (
+                    <tr key={i} className="market-data-tr">
+                      <td className="market-data-td">{r.tradingSymbol}</td>
+                      <td className="market-data-td market-data-pcr">{Number(r.pcr).toFixed(2)}</td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -768,21 +834,29 @@ export default function Dashboard() {
                 </tr>
               </thead>
               <tbody>
-                {oiBuildupData.slice(0, 10).map((r, i) => {
-                  const pct = Number(r.percentChange)
-                  const pctClass = pct >= 0 ? 'positive' : 'negative'
-                  const pctStr = (pct >= 0 ? '+' : '') + r.percentChange + '%'
-                  return (
-                    <tr key={i} className="market-data-tr">
-                      <td className="market-data-td">{r.tradingSymbol}</td>
-                      <td className="market-data-td">{r.ltp}</td>
-                      <td className={`market-data-td ${pctClass}`}>{pctStr}</td>
-                      <td className="market-data-td market-data-td-muted">
-                        {Number(r.opnInterest).toLocaleString('en-IN')}
-                      </td>
-                    </tr>
-                  )
-                })}
+                {oiBuildupData.length === 0 ? (
+                  <tr className="market-data-tr">
+                    <td colSpan={4} className="market-data-td market-data-td-muted" style={{ textAlign: 'center' }}>
+                      No data
+                    </td>
+                  </tr>
+                ) : (
+                  oiBuildupData.slice(0, 10).map((r, i) => {
+                    const pct = Number(r.percentChange)
+                    const pctClass = pct >= 0 ? 'positive' : 'negative'
+                    const pctStr = (pct >= 0 ? '+' : '') + Number(r.percentChange).toFixed(2) + '%'
+                    return (
+                      <tr key={i} className="market-data-tr">
+                        <td className="market-data-td">{r.tradingSymbol}</td>
+                        <td className="market-data-td market-data-td-muted">{r.ltp}</td>
+                        <td className={`market-data-td ${pctClass}`}>{pctStr}</td>
+                        <td className="market-data-td market-data-td-muted">
+                          {Number(r.opnInterest).toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                        </td>
+                      </tr>
+                    )
+                  })
+                )}
               </tbody>
             </table>
           </div>
@@ -792,9 +866,9 @@ export default function Dashboard() {
       <div className="dashboard-bottom-row">
         <div className="dashboard-card dashboard-card-wide">
           <div className="dashboard-card-header">
-            <h3 className="dashboard-card-title">Recent Trades</h3>
+            <h3 className="dashboard-card-title">Order Book</h3>
             <span className="dashboard-sync-badge">
-              {recentTrades.length} trades synced today
+              {orderBook.length} {orderBook.length === 1 ? 'order' : 'orders'} synced today
             </span>
           </div>
           <div className="dashboard-recent-table-wrap">
@@ -807,13 +881,47 @@ export default function Dashboard() {
                 </tr>
               </thead>
               <tbody>
-                {recentTrades.map((t, i) => {
+                {orderBook.map((o, i) => {
+                  const dateStr = o.filltime || o.updatetime || o.exchtime || ''
+                  const timeOnly = dateStr.includes(' ') ? dateStr.split(' ')[1] || dateStr : dateStr
+                  const date = timeOnly || '-'
+                  return (
+                    <tr key={o.uniqueorderid || i} className="dashboard-recent-tr">
+                      <td className="dashboard-recent-td">{date}</td>
+                      <td className="dashboard-recent-td">{o.tradingsymbol}</td>
+                      <td className="dashboard-recent-td">—</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div className="dashboard-card dashboard-card-wide">
+          <div className="dashboard-card-header">
+            <h3 className="dashboard-card-title">Trade Book</h3>
+            <span className="dashboard-sync-badge">
+              {tradeBook.length} {tradeBook.length === 1 ? 'trade' : 'trades'} synced today
+            </span>
+          </div>
+          <div className="dashboard-recent-table-wrap">
+            <table className="dashboard-recent-table">
+              <thead>
+                <tr>
+                  <th className="dashboard-recent-th">DATE</th>
+                  <th className="dashboard-recent-th">SYMBOL</th>
+                  <th className="dashboard-recent-th">P&L</th>
+                </tr>
+              </thead>
+              <tbody>
+                {tradeBook.map((t, i) => {
                   const date = t.filltime || '-'
                   const value = Number(t.tradevalue)
                   const pnlClass = value >= 0 ? 'positive' : 'negative'
                   const pnlStr = value >= 0 ? `+₹${value.toFixed(2)}` : `₹${value.toFixed(2)}`
                   return (
-                    <tr key={i} className="dashboard-recent-tr">
+                    <tr key={t.orderid || t.fillid || i} className="dashboard-recent-tr">
                       <td className="dashboard-recent-td">{date}</td>
                       <td className="dashboard-recent-td">{t.tradingsymbol}</td>
                       <td className={`dashboard-recent-td ${pnlClass}`}>{pnlStr}</td>

@@ -7,6 +7,11 @@ import {
   convertPositionApi,
   estimateBrokerageChargesApi,
   calculateMarginApi,
+  getGainersLosersApi,
+  getPutCallRatioApi,
+  getOIBuildupApi,
+  getOrderBookApi,
+  getTradeBookApi,
 } from '../utils/api'
 import type {
   ProfileResponse,
@@ -26,6 +31,7 @@ import type {
   OIBuildupResponse,
 } from '../types/dashboard'
 import type { TradeBookItem } from '../types/tradeBook'
+import type { OrderBookItem } from '../types/orderBook'
 
 /** Normalize profile data (API may return arrays for exchanges/products) */
 function normalizeProfileData(d: { clientcode: string; name: string; email: string; mobileno: string; exchanges: string[] | string; products: string[] | string; lastlogintime: string; brokerid: string }) {
@@ -103,16 +109,14 @@ export function convertPosition(req: PositionConversionRequest): Promise<Positio
   })
 }
 
-/** Mock: Get Trade Book (today's trades) – replace with real API call */
-export function getTradeBook(): Promise<{ status: boolean; data: TradeBookItem[] }> {
-  return Promise.resolve({
-    status: true,
-    data: [
-      { exchange: 'NSE', producttype: 'DELIVERY', tradingsymbol: 'ITC-EQ', instrumenttype: '', symbolgroup: 'EQ', strikeprice: '-1', optiontype: '', expirydate: '', marketlot: '1', precision: '2', multiplier: '-1', tradevalue: '175.00', transactiontype: 'BUY', fillprice: '175.00', fillsize: '1', orderid: '201020000000095', fillid: '50005750', filltime: '13:27:53' },
-      { exchange: 'NSE', producttype: 'INTRADAY', tradingsymbol: 'SBIN-EQ', instrumenttype: '', symbolgroup: 'EQ', strikeprice: '-1', optiontype: '', expirydate: '', marketlot: '1', precision: '2', multiplier: '-1', tradevalue: '-580.00', transactiontype: 'SELL', fillprice: '580.00', fillsize: '1', orderid: '201020000000096', fillid: '50005751', filltime: '14:15:22' },
-      { exchange: 'NSE', producttype: 'DELIVERY', tradingsymbol: 'RELIANCE-EQ', instrumenttype: '', symbolgroup: 'EQ', strikeprice: '-1', optiontype: '', expirydate: '', marketlot: '1', precision: '2', multiplier: '-1', tradevalue: '2298.25', transactiontype: 'BUY', fillprice: '2298.25', fillsize: '1', orderid: '201020000000097', fillid: '50005752', filltime: '15:02:10' },
-    ],
-  })
+/** Get Trade Book (today's trades) – real API GET /api/order/trade-book */
+export function getTradeBook(): Promise<{ status: boolean; message: string; errorcode: string; data: TradeBookItem[] }> {
+  return getTradeBookApi()
+}
+
+/** Get Order Book – real API GET /api/order/order-book */
+export function getOrderBook(): Promise<{ status: boolean; message: string; errorcode: string; data: OrderBookItem[] }> {
+  return getOrderBookApi()
 }
 
 /** Cumulative P&L by day (for charts) – in real app derive from trade book / positions over time */
@@ -160,49 +164,23 @@ export function calculateMargin(positions: {
   return calculateMarginApi(positions)
 }
 
-/** Mock: Top Gainers/Losers – replace with POST to gainersLosers API */
+/** Top Gainers/Losers – POST /api/market-data/gainers-losers */
 export function getGainersLosers(
   datatype: GainersLosersDataType,
-  _expirytype: GainersLosersExpiryType
+  expirytype: GainersLosersExpiryType
 ): Promise<GainersLosersResponse> {
-  const symbols = ['HDFCBANK25JAN24FUT', 'IEX25JAN24FUT', 'KOTAKBANK25JAN24FUT', 'ICICIGI25JAN24FUT', 'DRREDDY25JAN24FUT', 'TATASTEEL25JAN24FUT', 'OFSS25JAN24FUT', 'INDUSINDBK25JAN24FUT', 'CUB25JAN24FUT', 'GUJGASLTD25JAN24FUT']
-  const isGainer = datatype.includes('Gainers')
-  const data = symbols.map((tradingSymbol, i) => ({
-    tradingSymbol,
-    percentChange: isGainer ? 20.02 - i * 1.5 : -(10.5 + i * 0.8),
-    symbolToken: 55394 + i,
-    opnInterest: Math.floor(118861600 * (0.3 + Math.random() * 0.7)),
-    netChangeOpnInterest: Math.floor((isGainer ? 1 : -1) * (1.98e7 - i * 1e6)),
-  }))
-  return Promise.resolve({ status: true, message: 'SUCCESS', errorcode: '', data })
+  return getGainersLosersApi({ datatype, expirytype })
 }
 
-/** Mock: PCR Volume – replace with GET putCallRatio API */
+/** PCR Volume – GET /api/market-data/put-call-ratio */
 export function getPutCallRatio(): Promise<PCRResponse> {
-  const data = [
-    { pcr: 1.04, tradingSymbol: 'NIFTY25JAN24FUT' },
-    { pcr: 0.58, tradingSymbol: 'HEROMOTOCO25JAN24FUT' },
-    { pcr: 0.65, tradingSymbol: 'ADANIPORTS25JAN24FUT' },
-    { pcr: 0.92, tradingSymbol: 'BANKNIFTY25JAN24FUT' },
-    { pcr: 1.12, tradingSymbol: 'RELIANCE25JAN24FUT' },
-    { pcr: 0.78, tradingSymbol: 'TCS25JAN24FUT' },
-    { pcr: 0.88, tradingSymbol: 'SBIN25JAN24FUT' },
-    { pcr: 1.15, tradingSymbol: 'INFY25JAN24FUT' },
-  ]
-  return Promise.resolve({ status: true, message: 'SUCCESS', errorcode: '', data })
+  return getPutCallRatioApi()
 }
 
-/** Mock: OI Buildup – replace with POST OIBuildup API */
+/** OI Buildup – POST /api/market-data/oi-buildup */
 export function getOIBuildup(
-  _expirytype: OIBuildupExpiryType,
-  _datatype: OIBuildupDataType
+  expirytype: OIBuildupExpiryType,
+  datatype: OIBuildupDataType
 ): Promise<OIBuildupResponse> {
-  const data = [
-    { symbolToken: '55424', ltp: '723.8', netChange: '-28.25', percentChange: '-3.76', opnInterest: '24982.5', netChangeOpnInterest: '-76.25', tradingSymbol: 'JINDALSTEL25JAN24FUT' },
-    { symbolToken: '55452', ltp: '134.25', netChange: '-5.05', percentChange: '-3.63', opnInterest: '67965.0', netChangeOpnInterest: '-3120.0', tradingSymbol: 'NATIONALUM25JAN24FUT' },
-    { symbolToken: '55418', ltp: '892.5', netChange: '-12.4', percentChange: '-1.37', opnInterest: '45210.0', netChangeOpnInterest: '-2100.0', tradingSymbol: 'HINDALCO25JAN24FUT' },
-    { symbolToken: '55398', ltp: '245.6', netChange: '4.2', percentChange: '1.74', opnInterest: '125000.0', netChangeOpnInterest: '5200.0', tradingSymbol: 'TATAMOTORS25JAN24FUT' },
-    { symbolToken: '55461', ltp: '112.3', netChange: '-2.1', percentChange: '-1.84', opnInterest: '98700.0', netChangeOpnInterest: '-1500.0', tradingSymbol: 'ONGC25JAN24FUT' },
-  ]
-  return Promise.resolve({ status: true, message: 'SUCCESS', errorcode: '', data })
+  return getOIBuildupApi({ expirytype, datatype })
 }

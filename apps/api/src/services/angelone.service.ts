@@ -21,8 +21,26 @@ import {
   ConvertPositionResponse,
   MarginCalculatorRequest,
   MarginCalculatorResponse,
+  GainersLosersRequest,
+  GainersLosersResponse,
+  PutCallRatioResponse,
+  OIBuildupRequest,
+  OIBuildupResponse,
+  OptionGreekRequest,
+  OptionGreekResponse,
   ApiErrorResponse,
   ApiType,
+  PlaceOrderRequest,
+  PlaceOrderResponse,
+  ModifyOrderRequest,
+  ModifyOrderResponse,
+  CancelOrderRequest,
+  CancelOrderResponse,
+  GetOrderBookResponse,
+  GetTradeBookResponse,
+  GetLtpDataRequest,
+  GetLtpDataResponse,
+  GetOrderDetailsResponse,
 } from '../types/angelone.types';
 import { angelOneConfig, getApiKeyConfig } from '../config/angelone.config';
 
@@ -457,6 +475,407 @@ export class AngelOneService {
         throw {
           status: false,
           message: error.response.data?.message || 'Failed to calculate margin',
+          errorcode: error.response.data?.errorcode || 'UNKNOWN_ERROR',
+          data: error.response.data?.data,
+        } as ApiErrorResponse;
+      }
+      throw {
+        status: false,
+        message: error.message || 'Network error',
+        errorcode: 'NETWORK_ERROR',
+      } as ApiErrorResponse;
+    }
+  }
+
+  /**
+   * Top Gainers/Losers
+   * Returns top gainers or losers in derivatives (OI or price based) for NEAR/NEXT/FAR expiry
+   */
+  async getGainersLosers(
+    jwtToken: string,
+    request: GainersLosersRequest
+  ): Promise<GainersLosersResponse> {
+    try {
+      const config: AxiosRequestConfig = {
+        method: 'POST',
+        url: '/rest/secure/angelbroking/marketData/v1/gainersLosers',
+        headers: this.getHeaders({
+          Authorization: `Bearer ${jwtToken}`,
+        }),
+        data: JSON.stringify(request),
+      };
+
+      const response = await this.axiosInstance.request<GainersLosersResponse>(config);
+      return response.data;
+    } catch (error: any) {
+      if (error.response) {
+        throw {
+          status: false,
+          message: error.response.data?.message || 'Failed to fetch gainers/losers',
+          errorcode: error.response.data?.errorcode || 'UNKNOWN_ERROR',
+          data: error.response.data?.data,
+        } as ApiErrorResponse;
+      }
+      throw {
+        status: false,
+        message: error.message || 'Network error',
+        errorcode: 'NETWORK_ERROR',
+      } as ApiErrorResponse;
+    }
+  }
+
+  /**
+   * Put-Call Ratio (PCR) Volume
+   * Returns PCR for options contracts per underlying (mapped to futures symbol)
+   */
+  async getPutCallRatio(jwtToken: string): Promise<PutCallRatioResponse> {
+    try {
+      const config: AxiosRequestConfig = {
+        method: 'GET',
+        url: '/rest/secure/angelbroking/marketData/v1/putCallRatio',
+        headers: this.getHeaders({
+          Authorization: `Bearer ${jwtToken}`,
+        }),
+      };
+
+      const response = await this.axiosInstance.request<PutCallRatioResponse>(config);
+      return response.data;
+    } catch (error: any) {
+      if (error.response) {
+        throw {
+          status: false,
+          message: error.response.data?.message || 'Failed to fetch put-call ratio',
+          errorcode: error.response.data?.errorcode || 'UNKNOWN_ERROR',
+          data: error.response.data?.data,
+        } as ApiErrorResponse;
+      }
+      throw {
+        status: false,
+        message: error.message || 'Network error',
+        errorcode: 'NETWORK_ERROR',
+      } as ApiErrorResponse;
+    }
+  }
+
+  /**
+   * OI BuildUp
+   * Returns Long Built Up, Short Built Up, Short Covering, or Long Unwinding for NEAR/NEXT/FAR expiry
+   */
+  async getOIBuildup(
+    jwtToken: string,
+    request: OIBuildupRequest
+  ): Promise<OIBuildupResponse> {
+    try {
+      const config: AxiosRequestConfig = {
+        method: 'POST',
+        url: '/rest/secure/angelbroking/marketData/v1/OIBuildup',
+        headers: this.getHeaders({
+          Authorization: `Bearer ${jwtToken}`,
+        }),
+        data: JSON.stringify(request),
+      };
+
+      const response = await this.axiosInstance.request<OIBuildupResponse>(config);
+      return response.data;
+    } catch (error: any) {
+      if (error.response) {
+        throw {
+          status: false,
+          message: error.response.data?.message || 'Failed to fetch OI buildup',
+          errorcode: error.response.data?.errorcode || 'UNKNOWN_ERROR',
+          data: error.response.data?.data,
+        } as ApiErrorResponse;
+      }
+      throw {
+        status: false,
+        message: error.message || 'Network error',
+        errorcode: 'NETWORK_ERROR',
+      } as ApiErrorResponse;
+    }
+  }
+
+  /**
+   * Option Greeks
+   * Returns Delta, Gamma, Theta, Vega and Implied Volatility for multiple strike prices for an underlying and expiry
+   */
+  async getOptionGreek(
+    jwtToken: string,
+    request: OptionGreekRequest
+  ): Promise<OptionGreekResponse> {
+    try {
+      const config: AxiosRequestConfig = {
+        method: 'POST',
+        url: '/rest/secure/angelbroking/marketData/v1/optionGreek',
+        headers: this.getHeaders({
+          Authorization: `Bearer ${jwtToken}`,
+        }),
+        data: JSON.stringify(request),
+      };
+
+      const response = await this.axiosInstance.request<OptionGreekResponse>(config);
+      return response.data;
+    } catch (error: any) {
+      if (error.response) {
+        throw {
+          status: false,
+          message: error.response.data?.message || 'Failed to fetch option greeks',
+          errorcode: error.response.data?.errorcode || 'UNKNOWN_ERROR',
+          data: error.response.data?.data,
+        } as ApiErrorResponse;
+      }
+      throw {
+        status: false,
+        message: error.message || 'Network error',
+        errorcode: 'NETWORK_ERROR',
+      } as ApiErrorResponse;
+    }
+  }
+
+  /**
+   * Place Order
+   * Place a new order (normal, AMO, or stoploss)
+   */
+  async placeOrder(
+    jwtToken: string,
+    request: PlaceOrderRequest
+  ): Promise<PlaceOrderResponse> {
+    try {
+      const payload = {
+        ...request,
+        quantity: String(request.quantity),
+        ...(request.price !== undefined && { price: String(request.price) }),
+        ...(request.triggerprice !== undefined && { triggerprice: String(request.triggerprice) }),
+        ...(request.squareoff !== undefined && { squareoff: String(request.squareoff) }),
+        ...(request.stoploss !== undefined && { stoploss: String(request.stoploss) }),
+        ...(request.trailingStopLoss !== undefined && { trailingStopLoss: String(request.trailingStopLoss) }),
+      };
+      const config: AxiosRequestConfig = {
+        method: 'POST',
+        url: '/rest/secure/angelbroking/order/v1/placeOrder',
+        headers: this.getHeaders({
+          Authorization: `Bearer ${jwtToken}`,
+        }),
+        data: JSON.stringify(payload),
+      };
+      const response = await this.axiosInstance.request<PlaceOrderResponse>(config);
+      return response.data;
+    } catch (error: any) {
+      if (error.response) {
+        throw {
+          status: false,
+          message: error.response.data?.message || 'Failed to place order',
+          errorcode: error.response.data?.errorcode || 'UNKNOWN_ERROR',
+          data: error.response.data?.data,
+        } as ApiErrorResponse;
+      }
+      throw {
+        status: false,
+        message: error.message || 'Network error',
+        errorcode: 'NETWORK_ERROR',
+      } as ApiErrorResponse;
+    }
+  }
+
+  /**
+   * Modify Order
+   * Modify an open or pending order
+   */
+  async modifyOrder(
+    jwtToken: string,
+    request: ModifyOrderRequest
+  ): Promise<ModifyOrderResponse> {
+    try {
+      const payload = {
+        ...request,
+        price: String(request.price),
+        quantity: String(request.quantity),
+      };
+      const config: AxiosRequestConfig = {
+        method: 'POST',
+        url: '/rest/secure/angelbroking/order/v1/modifyOrder',
+        headers: this.getHeaders({
+          Authorization: `Bearer ${jwtToken}`,
+        }),
+        data: JSON.stringify(payload),
+      };
+      const response = await this.axiosInstance.request<ModifyOrderResponse>(config);
+      return response.data;
+    } catch (error: any) {
+      if (error.response) {
+        throw {
+          status: false,
+          message: error.response.data?.message || 'Failed to modify order',
+          errorcode: error.response.data?.errorcode || 'UNKNOWN_ERROR',
+          data: error.response.data?.data,
+        } as ApiErrorResponse;
+      }
+      throw {
+        status: false,
+        message: error.message || 'Network error',
+        errorcode: 'NETWORK_ERROR',
+      } as ApiErrorResponse;
+    }
+  }
+
+  /**
+   * Cancel Order
+   * Cancel an open or pending order
+   */
+  async cancelOrder(
+    jwtToken: string,
+    request: CancelOrderRequest
+  ): Promise<CancelOrderResponse> {
+    try {
+      const config: AxiosRequestConfig = {
+        method: 'POST',
+        url: '/rest/secure/angelbroking/order/v1/cancelOrder',
+        headers: this.getHeaders({
+          Authorization: `Bearer ${jwtToken}`,
+        }),
+        data: JSON.stringify(request),
+      };
+      const response = await this.axiosInstance.request<CancelOrderResponse>(config);
+      return response.data;
+    } catch (error: any) {
+      if (error.response) {
+        throw {
+          status: false,
+          message: error.response.data?.message || 'Failed to cancel order',
+          errorcode: error.response.data?.errorcode || 'UNKNOWN_ERROR',
+          data: error.response.data?.data,
+        } as ApiErrorResponse;
+      }
+      throw {
+        status: false,
+        message: error.message || 'Network error',
+        errorcode: 'NETWORK_ERROR',
+      } as ApiErrorResponse;
+    }
+  }
+
+  /**
+   * Get Order Book
+   * Retrieve order book (all orders)
+   */
+  async getOrderBook(jwtToken: string): Promise<GetOrderBookResponse> {
+    try {
+      const config: AxiosRequestConfig = {
+        method: 'GET',
+        url: '/rest/secure/angelbroking/order/v1/getOrderBook',
+        headers: this.getHeaders({
+          Authorization: `Bearer ${jwtToken}`,
+        }),
+      };
+      const response = await this.axiosInstance.request<GetOrderBookResponse>(config);
+      return response.data;
+    } catch (error: any) {
+      if (error.response) {
+        throw {
+          status: false,
+          message: error.response.data?.message || 'Failed to fetch order book',
+          errorcode: error.response.data?.errorcode || 'UNKNOWN_ERROR',
+          data: error.response.data?.data,
+        } as ApiErrorResponse;
+      }
+      throw {
+        status: false,
+        message: error.message || 'Network error',
+        errorcode: 'NETWORK_ERROR',
+      } as ApiErrorResponse;
+    }
+  }
+
+  /**
+   * Get Trade Book
+   * Retrieve trade book (trades for current day)
+   */
+  async getTradeBook(jwtToken: string): Promise<GetTradeBookResponse> {
+    try {
+      const config: AxiosRequestConfig = {
+        method: 'GET',
+        url: '/rest/secure/angelbroking/order/v1/getTradeBook',
+        headers: this.getHeaders({
+          Authorization: `Bearer ${jwtToken}`,
+        }),
+      };
+      const response = await this.axiosInstance.request<GetTradeBookResponse>(config);
+      return response.data;
+    } catch (error: any) {
+      if (error.response) {
+        throw {
+          status: false,
+          message: error.response.data?.message || 'Failed to fetch trade book',
+          errorcode: error.response.data?.errorcode || 'UNKNOWN_ERROR',
+          data: error.response.data?.data,
+        } as ApiErrorResponse;
+      }
+      throw {
+        status: false,
+        message: error.message || 'Network error',
+        errorcode: 'NETWORK_ERROR',
+      } as ApiErrorResponse;
+    }
+  }
+
+  /**
+   * Get LTP Data
+   * Retrieve last traded price data for a symbol
+   */
+  async getLtpData(
+    jwtToken: string,
+    request: GetLtpDataRequest
+  ): Promise<GetLtpDataResponse> {
+    try {
+      const config: AxiosRequestConfig = {
+        method: 'POST',
+        url: '/rest/secure/angelbroking/order/v1/getLtpData',
+        headers: this.getHeaders({
+          Authorization: `Bearer ${jwtToken}`,
+        }),
+        data: JSON.stringify(request),
+      };
+      const response = await this.axiosInstance.request<GetLtpDataResponse>(config);
+      return response.data;
+    } catch (error: any) {
+      if (error.response) {
+        throw {
+          status: false,
+          message: error.response.data?.message || 'Failed to fetch LTP data',
+          errorcode: error.response.data?.errorcode || 'UNKNOWN_ERROR',
+          data: error.response.data?.data,
+        } as ApiErrorResponse;
+      }
+      throw {
+        status: false,
+        message: error.message || 'Network error',
+        errorcode: 'NETWORK_ERROR',
+      } as ApiErrorResponse;
+    }
+  }
+
+  /**
+   * Get Individual Order Details
+   * Retrieve order details by uniqueorderid
+   */
+  async getOrderDetails(
+    jwtToken: string,
+    uniqueOrderId: string
+  ): Promise<GetOrderDetailsResponse> {
+    try {
+      const config: AxiosRequestConfig = {
+        method: 'GET',
+        url: `/rest/secure/angelbroking/order/v1/details/${encodeURIComponent(uniqueOrderId)}`,
+        headers: this.getHeaders({
+          Authorization: `Bearer ${jwtToken}`,
+        }),
+      };
+      const response = await this.axiosInstance.request<GetOrderDetailsResponse>(config);
+      return response.data;
+    } catch (error: any) {
+      if (error.response) {
+        throw {
+          status: false,
+          message: error.response.data?.message || 'Failed to fetch order details',
           errorcode: error.response.data?.errorcode || 'UNKNOWN_ERROR',
           data: error.response.data?.data,
         } as ApiErrorResponse;

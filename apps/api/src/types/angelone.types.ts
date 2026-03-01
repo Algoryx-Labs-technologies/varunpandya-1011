@@ -409,3 +409,297 @@ export interface ApiErrorResponse {
   data?: any;
 }
 
+// --- Market Data (Gainers/Losers, PCR, OI BuildUp) ---
+
+/** Gainers/Losers datatype: PercPriceGainers | PercPriceLosers | PercOILosers | PercOIGainers */
+export type GainersLosersDataType = 'PercPriceGainers' | 'PercPriceLosers' | 'PercOILosers' | 'PercOIGainers';
+
+/** Expiry type: NEAR | NEXT | FAR */
+export type GainersLosersExpiryType = 'NEAR' | 'NEXT' | 'FAR';
+
+export interface GainersLosersRequest {
+  datatype: GainersLosersDataType;
+  expirytype: GainersLosersExpiryType;
+}
+
+export interface GainersLosersItem {
+  tradingSymbol: string;
+  percentChange: number;
+  symbolToken: number;
+  opnInterest: number;
+  netChangeOpnInterest: number;
+}
+
+export interface GainersLosersResponse {
+  status: boolean;
+  message: string;
+  errorcode: string;
+  data: GainersLosersItem[];
+}
+
+export interface PutCallRatioItem {
+  pcr: number;
+  tradingSymbol: string;
+}
+
+export interface PutCallRatioResponse {
+  status: boolean;
+  message: string;
+  errorcode: string;
+  data: PutCallRatioItem[];
+}
+
+/** OI BuildUp datatype: "Long Built Up" | "Short Built Up" | "Short Covering" | "Long Unwinding" */
+export type OIBuildupDataType = 'Long Built Up' | 'Short Built Up' | 'Short Covering' | 'Long Unwinding';
+
+export type OIBuildupExpiryType = 'NEAR' | 'NEXT' | 'FAR';
+
+export interface OIBuildupRequest {
+  expirytype: OIBuildupExpiryType;
+  datatype: OIBuildupDataType;
+}
+
+export interface OIBuildupItem {
+  symbolToken: string;
+  ltp: string;
+  netChange: string;
+  percentChange: string;
+  opnInterest: string;
+  netChangeOpnInterest: string;
+  tradingSymbol: string;
+}
+
+export interface OIBuildupResponse {
+  status: boolean;
+  message: string;
+  errorcode: string;
+  data: OIBuildupItem[];
+}
+
+// --- Option Greeks ---
+
+export interface OptionGreekRequest {
+  name: string;
+  expirydate: string;
+}
+
+export interface OptionGreekItem {
+  name: string;
+  expiry: string;
+  strikePrice: string;
+  optionType: string;
+  delta: string;
+  gamma: string;
+  theta: string;
+  vega: string;
+  impliedVolatility: string;
+  tradeVolume: string;
+}
+
+export interface OptionGreekResponse {
+  status: boolean;
+  message: string;
+  errorcode: string;
+  data: OptionGreekItem[];
+}
+
+// --- Order APIs ---
+
+/** Order variety: NORMAL | STOPLOSS | ROBO */
+export type OrderVariety = 'NORMAL' | 'STOPLOSS' | 'ROBO';
+
+/** Transaction type: BUY | SELL */
+export type TransactionType = 'BUY' | 'SELL';
+
+/** Order type: MARKET | LIMIT | STOPLOSS_LIMIT | STOPLOSS_MARKET */
+export type OrderType = 'MARKET' | 'LIMIT' | 'STOPLOSS_LIMIT' | 'STOPLOSS_MARKET';
+
+/** Product type: DELIVERY | CARRYFORWARD | MARGIN | INTRADAY | BO */
+export type ProductType = 'DELIVERY' | 'CARRYFORWARD' | 'MARGIN' | 'INTRADAY' | 'BO';
+
+/** Duration: DAY | IOC */
+export type OrderDuration = 'DAY' | 'IOC';
+
+/** Exchange: BSE | NSE | NFO | MCX | BFO | CDS */
+export type OrderExchange = 'BSE' | 'NSE' | 'NFO' | 'MCX' | 'BFO' | 'CDS';
+
+export interface PlaceOrderRequest {
+  variety: OrderVariety;
+  tradingsymbol: string;
+  symboltoken: string;
+  exchange: OrderExchange;
+  transactiontype: TransactionType;
+  ordertype: OrderType;
+  producttype: ProductType;
+  duration: OrderDuration;
+  quantity: string | number;
+  price?: string | number;
+  triggerprice?: string | number;
+  squareoff?: string | number;
+  stoploss?: string | number;
+  trailingStopLoss?: string | number;
+  disclosedquantity?: number;
+  ordertag?: string;
+  scripconsent?: string;
+}
+
+export interface PlaceOrderResponseData {
+  script?: string;
+  orderid: string;
+  uniqueorderid: string;
+}
+
+export interface PlaceOrderResponse {
+  status: boolean;
+  message: string;
+  errorcode: string;
+  data: PlaceOrderResponseData;
+}
+
+export interface ModifyOrderRequest {
+  variety: OrderVariety;
+  orderid: string;
+  ordertype: OrderType;
+  producttype: ProductType;
+  duration: OrderDuration;
+  price: string | number;
+  quantity: string | number;
+  tradingsymbol?: string;
+  symboltoken?: string;
+  exchange?: OrderExchange;
+}
+
+export interface ModifyOrderResponseData {
+  orderid: string;
+  uniqueorderid: string;
+}
+
+export interface ModifyOrderResponse {
+  status: boolean;
+  message: string;
+  errorcode: string;
+  data: ModifyOrderResponseData;
+}
+
+export interface CancelOrderRequest {
+  variety: OrderVariety;
+  orderid: string;
+}
+
+export interface CancelOrderResponseData {
+  orderid: string;
+  uniqueorderid: string;
+}
+
+export interface CancelOrderResponse {
+  status: boolean;
+  message: string;
+  errorcode: string;
+  data: CancelOrderResponseData;
+}
+
+export interface OrderBookItem {
+  variety: string;
+  ordertype: string;
+  producttype: string;
+  duration: string;
+  price: string;
+  triggerprice: string;
+  quantity: string;
+  disclosedquantity: string;
+  squareoff: string;
+  stoploss: string;
+  trailingstoploss: string;
+  tradingsymbol: string;
+  transactiontype: string;
+  exchange: string;
+  symboltoken: string | null;
+  instrumenttype: string;
+  strikeprice: string;
+  optiontype: string;
+  expirydate: string;
+  lotsize: string;
+  cancelsize: string;
+  averageprice: string;
+  filledshares: string;
+  unfilledshares: string;
+  orderid: string;
+  text: string;
+  status: string;
+  orderstatus: string;
+  updatetime: string;
+  exchtime: string;
+  exchorderupdatetime: string;
+  fillid: string;
+  filltime: string;
+  parentorderid: string;
+  uniqueorderid: string;
+  exchangeorderid: string;
+}
+
+export interface GetOrderBookResponse {
+  status: boolean;
+  message: string;
+  errorcode: string;
+  data: OrderBookItem[];
+}
+
+export interface TradeBookItem {
+  exchange: string;
+  producttype: string;
+  tradingsymbol: string;
+  instrumenttype: string;
+  symbolgroup: string;
+  strikeprice: string;
+  optiontype: string;
+  expirydate: string;
+  marketlot: string;
+  precision: string;
+  multiplier: string;
+  tradevalue: string;
+  transactiontype: string;
+  fillprice: string;
+  fillsize: string;
+  orderid: string;
+  fillid: string;
+  filltime: string;
+}
+
+export interface GetTradeBookResponse {
+  status: boolean;
+  message: string;
+  errorcode: string;
+  data: TradeBookItem[];
+}
+
+export interface GetLtpDataRequest {
+  exchange: OrderExchange;
+  tradingsymbol: string;
+  symboltoken: string;
+}
+
+export interface LtpDataItem {
+  exchange: string;
+  tradingsymbol: string;
+  symboltoken: string;
+  open: string;
+  high: string;
+  low: string;
+  close: string;
+  ltp: string;
+}
+
+export interface GetLtpDataResponse {
+  status: boolean;
+  message: string;
+  errorcode: string;
+  data: LtpDataItem;
+}
+
+export interface GetOrderDetailsResponse {
+  status: boolean;
+  message: string;
+  errorcode: string;
+  data: OrderBookItem;
+}
+

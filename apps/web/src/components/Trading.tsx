@@ -1,76 +1,20 @@
 import React, { useEffect, useState } from 'react'
-import { getOptionChainData, getCurrentNiftyPrice } from '../data/optionChain'
-import { getStrategyLogBarData } from '../data/strategyLogBars'
+import { getCurrentNiftyPrice } from '../data/optionChain'
+import { getPosition, getAllHolding } from '../data/dashboard'
+import { getLogsData } from '../data/logs'
 import { initTradingViewChart } from '../lib/tradingView'
-import type { OptionChainRow } from '../data/optionChain'
-
-function OptionChainTable({ rows }: { rows: OptionChainRow[] }) {
-  return (
-    <div className="option-chain-wrap">
-      <table className="option-chain-table">
-        <thead>
-          <tr>
-            <th className="option-chain-th">CALL IV</th>
-            <th className="option-chain-th">CALL DELTA</th>
-            <th className="option-chain-th">CALL LTP</th>
-            <th className="option-chain-th option-chain-strike-th">STRIKE</th>
-            <th className="option-chain-th">PUT LTP</th>
-            <th className="option-chain-th">PUT DELTA</th>
-            <th className="option-chain-th">PUT IV</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r, i) => (
-            <tr
-              key={i}
-              className={`option-chain-tr ${r.isAtm ? 'option-chain-atm' : ''}`}
-              title={r.isAtm ? '25,325.00 | +85.90 (0.34%)' : undefined}
-            >
-              <td className="option-chain-td option-chain-call">{r.callIv}</td>
-              <td className="option-chain-td option-chain-call">{r.callDelta}</td>
-              <td className="option-chain-td option-chain-call option-chain-ltp">
-                {r.callLtp} <span className={`option-chain-pct positive`}>{r.callLtpChgPct}</span>
-              </td>
-              <td className="option-chain-td option-chain-strike">{r.strike.toLocaleString('en-IN')}</td>
-              <td className="option-chain-td option-chain-put option-chain-ltp">
-                {r.putLtp} <span className={`option-chain-pct negative`}>{r.putLtpChgPct}</span>
-              </td>
-              <td className="option-chain-td option-chain-put">{r.putDelta}</td>
-              <td className="option-chain-td option-chain-put">{r.putIv}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  )
-}
-
-function OpenInterestBars() {
-  const data = getStrategyLogBarData()
-  const maxVal = Math.max(...data.flatMap((d) => [d.callOi, d.putOi]), 1)
-  return (
-    <>
-      {data.map((d, i) => (
-        <div key={i} className="oi-bar-group">
-          <div
-            className="oi-bar oi-call"
-            style={{ height: `${(d.callOi / maxVal) * 100}%` }}
-          ></div>
-          <div
-            className="oi-bar oi-put"
-            style={{ height: `${(d.putOi / maxVal) * 100}%` }}
-          ></div>
-          <span className="oi-bar-label">{d.label}</span>
-        </div>
-      ))}
-    </>
-  )
-}
+import type { PositionItem, HoldingItem } from '../types/dashboard'
 
 export default function Trading() {
   const [terminalTime, setTerminalTime] = useState('')
   const [niftyPrice] = useState(() => getCurrentNiftyPrice().toLocaleString('en-IN'))
-  const [optionChainData] = useState(() => getOptionChainData())
+  const [holdings, setHoldings] = useState<HoldingItem[]>([])
+  const [holdingsLoading, setHoldingsLoading] = useState(true)
+  const [holdingsError, setHoldingsError] = useState(false)
+  const [positionsNet, setPositionsNet] = useState<PositionItem[]>([])
+  const [positionsDay, setPositionsDay] = useState<PositionItem[]>([])
+  const [positionsLoading, setPositionsLoading] = useState(true)
+  const [positionsError, setPositionsError] = useState(false)
 
   useEffect(() => {
     const updateTime = () => {
@@ -86,6 +30,49 @@ export default function Trading() {
   useEffect(() => {
     initTradingViewChart()
   }, [])
+
+  useEffect(() => {
+    const loadHoldings = async () => {
+      setHoldingsLoading(true)
+      setHoldingsError(false)
+      try {
+        const res = await getAllHolding()
+        if (res?.data?.holdings?.length) setHoldings(res.data.holdings)
+        else setHoldings([])
+      } catch {
+        setHoldingsError(true)
+        setHoldings([])
+      } finally {
+        setHoldingsLoading(false)
+      }
+    }
+    loadHoldings()
+  }, [])
+
+  useEffect(() => {
+    const loadPositions = async () => {
+      setPositionsLoading(true)
+      setPositionsError(false)
+      try {
+        const res = await getPosition()
+        if (res?.data?.net) setPositionsNet(res.data.net)
+        else setPositionsNet([])
+        if (res?.data?.day) setPositionsDay(res.data.day)
+        else setPositionsDay([])
+      } catch {
+        setPositionsError(true)
+        setPositionsNet([])
+        setPositionsDay([])
+      } finally {
+        setPositionsLoading(false)
+      }
+    }
+    loadPositions()
+  }, [])
+
+  const hasPositions = positionsNet.length > 0 || positionsDay.length > 0
+  const hasHoldings = holdings.length > 0
+  const botLogs = getLogsData()
 
   return (
     <div className="page-content page-content-terminal">
@@ -212,65 +199,150 @@ export default function Trading() {
         <div className="terminal-right-col">
           <div className="terminal-panel option-chain-panel">
             <div className="terminal-panel-header">
-              <h3 className="terminal-panel-title">Option Chain</h3>
+              <h3 className="terminal-panel-title">Holdings</h3>
               <button type="button" className="terminal-panel-close" aria-label="Close">×</button>
             </div>
-            <div className="option-chain-controls">
-              <span className="option-chain-symbol">Q NIFTY</span>
-              <select className="option-chain-expiry" aria-label="Expiry">
-                <option>23 Sept</option>
-              </select>
-              <button type="button" className="option-chain-toggle">BASKET</button>
-              <button type="button" className="option-chain-toggle">Σ GREEKS</button>
-            </div>
-            <OptionChainTable rows={optionChainData} />
+            {holdingsLoading && (
+              <div className="oi-bars-chart" style={{ alignItems: 'center', justifyContent: 'center', minHeight: 80 }}>
+                <span className="market-data-td-muted">Loading…</span>
+              </div>
+            )}
+            {!holdingsLoading && holdingsError && (
+              <div className="oi-bars-chart" style={{ alignItems: 'center', justifyContent: 'center', minHeight: 80 }}>
+                <span className="market-data-td-muted">Unable to load holdings</span>
+              </div>
+            )}
+            {!holdingsLoading && !holdingsError && !hasHoldings && (
+              <div className="oi-bars-chart" style={{ alignItems: 'center', justifyContent: 'center', minHeight: 80 }}>
+                <span className="market-data-td-muted">No holdings</span>
+              </div>
+            )}
+            {!holdingsLoading && !holdingsError && hasHoldings && (
+              <div className="market-data-table-wrap" style={{ padding: '8px 0' }}>
+                <table className="market-data-table">
+                  <thead>
+                    <tr>
+                      <th className="market-data-th">Symbol</th>
+                      <th className="market-data-th">Qty</th>
+                      <th className="market-data-th">Avg</th>
+                      <th className="market-data-th">LTP</th>
+                      <th className="market-data-th">P&L</th>
+                      <th className="market-data-th">P&L %</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {holdings.map((h, i) => {
+                      const pnlClass = h.profitandloss >= 0 ? 'positive' : 'negative'
+                      return (
+                        <tr key={i} className="market-data-tr">
+                          <td className="market-data-td">{h.tradingsymbol}</td>
+                          <td className="market-data-td">{h.quantity}</td>
+                          <td className="market-data-td">₹{h.averageprice.toFixed(2)}</td>
+                          <td className="market-data-td">₹{h.ltp.toFixed(2)}</td>
+                          <td className={`market-data-td ${pnlClass}`}>₹{h.profitandloss.toFixed(2)}</td>
+                          <td className={`market-data-td ${pnlClass}`}>{h.pnlpercentage.toFixed(2)}%</td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
 
           <div className="terminal-panel open-interest-panel">
             <div className="terminal-panel-header">
-              <h3 className="terminal-panel-title">Open Interest</h3>
+              <h3 className="terminal-panel-title">Positions</h3>
               <button type="button" className="terminal-panel-close" aria-label="Close">×</button>
             </div>
-            <div className="oi-controls">
-              <span className="oi-symbol">NIFTY</span>
-              <select className="oi-expiry" aria-label="Expiry">
-                <option>23 Sept</option>
-              </select>
-            </div>
-            <div className="oi-legend">
-              <span className="oi-legend-item">
-                <i className="oi-legend-call"></i> Call
-              </span>
-              <span className="oi-legend-item">
-                <i className="oi-legend-put"></i> Put
-              </span>
-              <span className="oi-legend-item">
-                <i className="oi-legend-oi-up"></i> OI Increase
-              </span>
-              <span className="oi-legend-item">
-                <i className="oi-legend-oi-down"></i> OI Decrease
-              </span>
-            </div>
-            <div className="oi-bars-chart">
-              <span className="oi-yaxis-label">1.0Cr</span>
-              <OpenInterestBars />
-            </div>
-            <div className="oi-footer">
-              <span className="oi-nifty-price">NIFTY {niftyPrice}</span>
-              <div className="oi-time-slider-wrap">
-                <input
-                  type="range"
-                  className="oi-time-slider"
-                  min="0"
-                  max="100"
-                  defaultValue="100"
-                  aria-label="Intraday time"
-                />
-                <span className="oi-time-label">09:15</span>
-                <span className="oi-time-label">15:20</span>
+            {positionsLoading && (
+              <div className="oi-bars-chart" style={{ alignItems: 'center', justifyContent: 'center', minHeight: 80 }}>
+                <span className="market-data-td-muted">Loading…</span>
               </div>
-            </div>
+            )}
+            {!positionsLoading && positionsError && (
+              <div className="oi-bars-chart" style={{ alignItems: 'center', justifyContent: 'center', minHeight: 80 }}>
+                <span className="market-data-td-muted">Unable to load positions</span>
+              </div>
+            )}
+            {!positionsLoading && !positionsError && !hasPositions && (
+              <div className="oi-bars-chart" style={{ alignItems: 'center', justifyContent: 'center', minHeight: 80 }}>
+                <span className="market-data-td-muted">No positions</span>
+              </div>
+            )}
+            {!positionsLoading && !positionsError && hasPositions && (
+              <div className="positions-tabs" style={{ padding: '8px 0' }}>
+                <h4 className="positions-subtitle">Net</h4>
+                <div className="market-data-table-wrap">
+                  <table className="market-data-table">
+                    <thead>
+                      <tr>
+                        <th className="market-data-th">Symbol</th>
+                        <th className="market-data-th">Product</th>
+                        <th className="market-data-th">Net Qty</th>
+                        <th className="market-data-th">Net Value</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {positionsNet.map((p, i) => (
+                        <tr key={i} className="market-data-tr">
+                          <td className="market-data-td">{p.tradingsymbol}</td>
+                          <td className="market-data-td">{p.producttype}</td>
+                          <td className="market-data-td">{p.netqty}</td>
+                          <td className="market-data-td">{p.netvalue}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <h4 className="positions-subtitle">Day</h4>
+                <div className="market-data-table-wrap">
+                  <table className="market-data-table">
+                    <thead>
+                      <tr>
+                        <th className="market-data-th">Symbol</th>
+                        <th className="market-data-th">Product</th>
+                        <th className="market-data-th">Net Qty</th>
+                        <th className="market-data-th">Net Value</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {positionsDay.length === 0 ? (
+                        <tr><td className="market-data-td market-data-td-muted" colSpan={4}>No day positions</td></tr>
+                      ) : (
+                        positionsDay.map((p, i) => (
+                          <tr key={i} className="market-data-tr">
+                            <td className="market-data-td">{p.tradingsymbol}</td>
+                            <td className="market-data-td">{p.producttype}</td>
+                            <td className="market-data-td">{p.netqty}</td>
+                            <td className="market-data-td">{p.netvalue}</td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
+        </div>
+      </div>
+
+      <div className="bot-logs">
+        <h3 className="bot-logs-title">Bot logs</h3>
+        <div className="bot-logs-content">
+          {botLogs.length === 0 ? (
+            <div className="bot-log-empty">No strategy logs</div>
+          ) : (
+            botLogs.map((entry, i) => (
+              <div key={i} className={`bot-log-entry bot-log-entry--${entry.level.toLowerCase()}`}>
+                <span className="bot-log-time">{entry.time}</span>
+                <span className="bot-log-level">{entry.level}</span>
+                <span className="bot-log-strategy">{entry.strategy}</span>
+                <span className="bot-log-message">{entry.message}</span>
+              </div>
+            ))
+          )}
         </div>
       </div>
     </div>

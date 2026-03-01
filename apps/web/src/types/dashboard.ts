@@ -224,8 +224,8 @@ export interface GainersLosersItem {
   tradingSymbol: string
   percentChange: number
   symbolToken: number
-  opnInterest: number
-  netChangeOpnInterest: number
+  ltp: number
+  netChange: number
 }
 
 export interface GainersLosersResponse {

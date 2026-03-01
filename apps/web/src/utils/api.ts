@@ -372,3 +372,96 @@ export async function calculateMarginApi(positions: {
   return parseResponse(response, data)
 }
 
+/**
+ * POST /api/market-data/gainers-losers – top gainers/losers (OI or price) for derivatives
+ */
+export async function getGainersLosersApi(body: {
+  datatype: 'PercOIGainers' | 'PercOILosers' | 'PercPriceGainers' | 'PercPriceLosers'
+  expirytype: 'NEAR' | 'NEXT' | 'FAR'
+}): Promise<{
+  status: boolean
+  message: string
+  errorcode: string
+  data: { tradingSymbol: string; percentChange: number; symbolToken: number; ltp: number; netChange: number }[]
+}> {
+  const response = await fetch(`${API_BASE_URL}/api/market-data/gainers-losers`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify(body),
+  })
+  const data = await response.json()
+  return parseResponse(response, data)
+}
+
+/**
+ * GET /api/market-data/put-call-ratio – PCR for options (mapped to futures symbols)
+ */
+export async function getPutCallRatioApi(): Promise<{
+  status: boolean
+  message: string
+  errorcode: string
+  data: { pcr: number; tradingSymbol: string }[]
+}> {
+  const response = await fetch(`${API_BASE_URL}/api/market-data/put-call-ratio`, {
+    method: 'GET',
+    headers: authHeaders(),
+  })
+  const data = await response.json()
+  return parseResponse(response, data)
+}
+
+/**
+ * GET /api/order/order-book – order book (all orders)
+ */
+export async function getOrderBookApi(): Promise<{
+  status: boolean
+  message: string
+  errorcode: string
+  data: import('../types/orderBook').OrderBookItem[]
+}> {
+  const response = await fetch(`${API_BASE_URL}/api/order/order-book`, {
+    method: 'GET',
+    headers: authHeaders(),
+  })
+  const data = await response.json()
+  return parseResponse(response, data)
+}
+
+/**
+ * GET /api/order/trade-book – trade book (today's trades)
+ */
+export async function getTradeBookApi(): Promise<{
+  status: boolean
+  message: string
+  errorcode: string
+  data: import('../types/tradeBook').TradeBookItem[]
+}> {
+  const response = await fetch(`${API_BASE_URL}/api/order/trade-book`, {
+    method: 'GET',
+    headers: authHeaders(),
+  })
+  const data = await response.json()
+  return parseResponse(response, data)
+}
+
+/**
+ * POST /api/market-data/oi-buildup – long/short buildup, short covering, long unwinding
+ */
+export async function getOIBuildupApi(body: {
+  expirytype: 'NEAR' | 'NEXT' | 'FAR'
+  datatype: 'Long Built Up' | 'Short Built Up' | 'Short Covering' | 'Long Unwinding'
+}): Promise<{
+  status: boolean
+  message: string
+  errorcode: string
+  data: { symbolToken: string; ltp: string; netChange: string; percentChange: string; opnInterest: string; netChangeOpnInterest: string; tradingSymbol: string }[]
+}> {
+  const response = await fetch(`${API_BASE_URL}/api/market-data/oi-buildup`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify(body),
+  })
+  const data = await response.json()
+  return parseResponse(response, data)
+}
+

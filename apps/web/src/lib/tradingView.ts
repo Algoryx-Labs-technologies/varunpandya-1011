@@ -1,7 +1,7 @@
 const TRADINGVIEW_SCRIPT_URL =
   'https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js'
 
-/** AAPL on NASDAQ. TradingView format is EXCHANGE:SYMBOL. Config must be in the same script tag as src so the widget can read it. */
+/** Nasdaq AAPL. TradingView format is EXCHANGE:SYMBOL. Config is read from the script tag innerHTML by the widget. */
 const CHART_SYMBOL = 'NASDAQ:AAPL'
 
 function getTradingViewConfig(interval: string) {
@@ -9,12 +9,14 @@ function getTradingViewConfig(interval: string) {
     autosize: true,
     symbol: CHART_SYMBOL,
     interval: interval === 'D' ? 'D' : interval,
-    timezone: 'Etc/UTC',
+    timezone: 'exchange',
     theme: 'dark',
     style: '1',
     locale: 'en',
     allow_symbol_change: true,
     calendar: false,
+    hide_top_toolbar: false,
+    save_image: true,
     support_host: 'https://www.tradingview.com',
   }
 }
@@ -33,8 +35,13 @@ export function initTradingViewChart() {
 
   const widgetInner = document.createElement('div')
   widgetInner.className = 'tradingview-widget-container__widget'
-  widgetInner.style.height = '100%'
+  widgetInner.style.height = 'calc(100% - 32px)'
   widgetInner.style.width = '100%'
+
+  const copyright = document.createElement('div')
+  copyright.className = 'tradingview-widget-copyright'
+  copyright.innerHTML =
+    '<a href="https://www.tradingview.com/symbols/NASDAQ-AAPL/?utm_source=www.tradingview.com&amp;utm_medium=widget_new&amp;utm_campaign=advanced-chart" rel="noopener nofollow" target="_blank"><span class="blue-text">AAPL stock chart</span></a> <span class="trademark">by TradingView</span>'
 
   const script = document.createElement('script')
   script.type = 'text/javascript'
@@ -43,6 +50,7 @@ export function initTradingViewChart() {
   script.innerHTML = JSON.stringify(config)
 
   widgetContainer.appendChild(widgetInner)
+  widgetContainer.appendChild(copyright)
   widgetContainer.appendChild(script)
   container.appendChild(widgetContainer)
 }
