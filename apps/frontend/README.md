@@ -4,11 +4,10 @@ Custom React frontend for the trading bot dashboard.
 
 ## Features
 
-- Real-time WebSocket updates
-- Dashboard with statistics
-- Trading view with levels
-- Signals and trades panels
-- Responsive design
+- Real-time WebSocket updates (signals, trades, OHLC, option chain, alerts, etc.)
+- **Market status**: Live / Market closed / Offline (from backend Indian market hours IST)
+- Dashboard, Trading (chart + levels + option chain), Signals, Trades, Patterns, Intelligence, Risk, Alerts, Statistics, Indicators, Analytics, AI, **Logs** (trading logs per day)
+- Responsive design; proxy to backend when using Vite dev (e.g. via `node run-all.js` from repo root)
 
 ## Installation
 
@@ -32,8 +31,4 @@ npm run build
 
 ## Configuration
 
-The frontend connects to:
-- Backend API: `http://localhost:3000`
-- WebSocket: `ws://localhost:3000/ws`
-
-These can be configured in `vite.config.js` if needed.
+When running with `node run-all.js` from repo root, the script writes `VITE_API_PORT` to `.env.local` so the Vite dev server proxies `/api` and `/ws` to the backend. Otherwise set `VITE_BACKEND_URL` or ensure `vite.config.js` proxy targets the correct backend port (default 3000).

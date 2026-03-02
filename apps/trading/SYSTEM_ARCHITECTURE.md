@@ -32,9 +32,10 @@ Production-grade, institutional-level intraday options trading system for Nifty/
 ### 3. Level Engine (`levels/level_manager.py`)
 
 #### Manual Mode
-- CSV upload support (format: `index, timeframe, level_type, price, stoploss, target`)
-- GUI entry support
-- Level types: EU, TFD, ED, TFU, RU, TFRU, RD, TFRD, EURTZ, EDRTZ
+- CSV/Excel upload (required columns: `price`, `type`, `timeframe`; optional: stoploss, target, confidence)
+- GUI entry support (Trading tab: Add level, Load from file)
+- Level types: EU (Easy Up), TFD (Target From Down), ED (Easy Down), TFU (Target From Up), RU (Reversal Up), TFRU, RD (Reversal Down), TFRD, EURTZ (Easy Up Retest Zone), EDRTZ (Easy Down Retest Zone)
+- See `levels/README_LEVELS.md` and repo root `TRADING_ENGINE_EXPLAINED.md` (Section 4) for full level semantics and automatic level calculation
 
 #### AI Auto-Level Mode (`ai/ml_level_detector.py`)
 - **10+ Indicator Variations**:
@@ -92,15 +93,11 @@ Production-grade, institutional-level intraday options trading system for Nifty/
     - ED + bearish pattern → Buy PUT
     - RU/RD → Reversal logic
 
-- **Target Logic**:
-  - Wait max 7-10 candles
-  - Exit at target if hit
-  - Exit at candle 10 close if target not hit
-  - Fully vectorized computation
-
-- **Stop Loss**:
-  - User-defined SL
-  - Immediate exit if hit
+- **Exit Logic** (see `TRADING_ENGINE_EXPLAINED.md` Section 3):
+  - **Stop loss**: Always allowed immediately (user-defined SL %).
+  - **Minimum hold**: No take-profit or time-based exit until `MIN_CANDLES_BEFORE_EXIT` candles (default 7).
+  - **Take profit**: Allowed only after min candles; exit at target if hit.
+  - **Time-based square off**: After `CANDLES_BEFORE_SQUARE_OFF` candles (default 10), exit at market if still in trade.
 
 ### 6. Strike Selection Engine (`money/position_sizing.py`)
 - **Manual Mode**: User provides daily strikes list
@@ -113,12 +110,13 @@ Production-grade, institutional-level intraday options trading system for Nifty/
   - Vectorized selection
 
 ### 7. Risk Engine (`risk/risk_manager.py`)
-- **Auto Lock**: After 2 trades per day
-- **Kill Switch**: At 3:15 PM
+- **Auto Lock**: After `MAX_TRADES_PER_DAY` (default 2); no new trades until next day (or manual unlock).
+- **Kill Switch**: At `KILL_SWITCH_TIME` (e.g. 15:15 IST)
   - Cancel all open orders
   - Square off positions
-  - Reset system
-- **Manual Unlock**: Via UI toggle
+  - Set auto-lock
+- **Cycle net PnL target** (opt-in): If `ENABLE_NET_PNL_TARGET=true`, when daily PnL as % of capital ≥ `NET_PNL_TARGET_PERCENT` (e.g. 20%), no new trades until next day.
+- **Manual Unlock**: `risk_manager.unlock_trading()` / reset_daily().
 
 ### 8. Multithreading (`execution/execution_engine.py`)
 - **Threads**:
@@ -171,32 +169,20 @@ Production-grade, institutional-level intraday options trading system for Nifty/
 - **3:15 PM**: Kill switch
 
 ### 14. Frontend (`apps/frontend/`)
-- **React Dashboard**:
-  - Real-time candlestick charts (TradingView lightweight)
-  - Level overlay lines
-  - Entry/exit markers
-  - Trade journal dashboard
-  - Manual level entry form
-  - CSV upload
-  - Capital allocation input
-  - Strike list input
-  - AI/manual mode toggle
-  - Autolock toggle/unlock button
-  - Live P&L display
-  - Missed trade suggestions
-  - Indicator overlay selector
-  - WebSocket real-time updates
+- **React Dashboard** (tabs: Dashboard, Trading, Signals, Trades, Patterns, Intelligence, Risk, Alerts, Statistics, Indicators, Analytics, AI, **Logs**):
+  - Real-time candlestick charts (lightweight-charts) + level overlay
+  - Option chain panel
+  - Manual level entry and CSV/Excel upload
+  - **Market status**: Live / Market closed / Offline (from Indian market hours IST via backend `/api/trading/market-status`)
+  - **Logs tab**: Select date, view trading logs for that day (from backend DB)
+  - WebSocket real-time updates (signals, trades, OHLC, option chain, alerts, etc.)
 
 ### 15. Backend API (`apps/backend/`)
-- **REST Endpoints**:
-  - `POST /api/trading/signals` - Receive signals
-  - `POST /api/trading/trades` - Receive trades
-  - `POST /api/trading/levels` - Receive levels
-  - `POST /api/trading/market-data` - Receive market data
-  - `GET /api/trading/*` - Retrieve data
-  - `GET /api/trading/statistics` - Get analytics
-
-- **WebSocket**: Real-time updates to frontend
+- **REST**: In-memory store + optional SQLite (candles, option_snapshots, trades, **trading_logs**).
+- **Key endpoints**:
+  - `POST /api/trading/signals`, `/trades`, `/levels`, `/market-data`, `/ohlc`, `/option-chain`, `/alert`, `/pattern-detection`, **`/logs`**
+  - `GET /api/trading/ohlc`, `/option-chain`, `/signals`, `/trades`, `/statistics`, **`/logs?date=YYYY-MM-DD`**, **`/market-status`** (Indian market hours IST)
+- **WebSocket**: Real-time broadcast of signals, trades, OHLC, option-chain, alerts, pattern-detection, risk-status, etc.
 
 ## Data Flow
 
@@ -245,13 +231,12 @@ Frontend (React)
 
 ## Installation & Setup
 
-1. Install dependencies: `pip install -r requirements.txt`
-2. Configure `key.txt` with Angel One credentials
-3. Set up `.env` for additional configuration
-4. Run: `python main.py`
+1. **Trading bot**: `cd apps/trading`, `pip install -r requirements.txt`, configure `key.txt` (or `.env`) with Angel One credentials, set `BACKEND_API_URL` in `.env`, run `python main.py`.
+2. **Full stack**: From repo root run `node run-all.js` to start backend + frontend; see repo root **`TRADING_ENGINE_EXPLAINED.md`** Section 12 (Process to run the system) for full steps.
 
 ## Integration
 
-- Backend API: `http://localhost:3000`
+- Backend API: `http://localhost:3000` (or port chosen by `run-all.js`)
 - Frontend: `http://localhost:5173`
-- WebSocket: `ws://localhost:3000/ws`
+- WebSocket: `ws://localhost:<port>/ws`
+- For full architecture and level/exit/risk details, see **`TRADING_ENGINE_EXPLAINED.md`** in the repo root.

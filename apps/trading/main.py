@@ -5,6 +5,7 @@ Orchestrates all components and runs the trading strategy
 import time
 import threading
 from datetime import datetime
+from typing import Dict
 from loguru import logger
 from config import Config
 
@@ -42,6 +43,9 @@ class TradingBot:
         self.running = False
         self.active_trades: Dict[str, TradeSignal] = {}
         self.market_data_cache: Dict = {}
+        # Trade cycle: net PnL for current day (reset on new day); used when ENABLE_NET_PNL_TARGET is True
+        self._cycle_net_pnl = 0.0
+        self._cycle_date = datetime.now().date()
         
         # Setup logging
         logger.add(
@@ -89,13 +93,20 @@ class TradingBot:
         
         try:
             while self.running:
+                # Reset cycle PnL and risk daily state on new day
+                today = datetime.now().date()
+                if today != self._cycle_date:
+                    self._cycle_date = today
+                    self._cycle_net_pnl = 0.0
+                    self.risk_manager.reset_daily()
+
                 # Check if trading is allowed
                 can_trade, reason = self.risk_manager.can_trade()
                 if not can_trade:
                     logger.info(f"Trading paused: {reason}")
                     time.sleep(60)
                     continue
-                
+
                 # Process each index
                 for index in Config.INDEX_SYMBOLS.keys():
                     try:
@@ -323,7 +334,23 @@ class TradingBot:
             
             self.journal.add_trade(trade)
             self.backend_api.send_trade_execution(trade.to_dict())
-            
+            self.backend_api.send_trading_log("info", "Trade executed", trade.to_dict())
+
+            # Update cycle net PnL and check optional target (user opt-in)
+            self._cycle_net_pnl += pnl
+            capital = getattr(Config, "TRADING_CAPITAL", 1.0) or 1.0
+            net_pnl_pct = (self._cycle_net_pnl / capital) * 100.0
+            if getattr(Config, "ENABLE_NET_PNL_TARGET", False) and getattr(Config, "NET_PNL_TARGET_PERCENT", 0):
+                target_pct = float(Config.NET_PNL_TARGET_PERCENT)
+                if net_pnl_pct >= target_pct:
+                    self.risk_manager.set_cycle_pnl_target_reached(True)
+                    self.backend_api.send_trading_log(
+                        "info",
+                        f"Cycle net PnL target reached: {net_pnl_pct:.2f}% (target {target_pct}%)",
+                        {"cycle_net_pnl": self._cycle_net_pnl, "net_pnl_pct": net_pnl_pct, "target_pct": target_pct}
+                    )
+                    logger.warning(f"Cycle net PnL target reached: {net_pnl_pct:.2f}% >= {target_pct}%")
+
             logger.info(f"Trade exited: {signal.index} | Reason: {reason} | P&L: {pnl:.2f}")
         
         except Exception as e:

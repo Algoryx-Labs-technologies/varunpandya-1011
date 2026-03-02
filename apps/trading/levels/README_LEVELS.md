@@ -1,17 +1,23 @@
 # Manual Levels – User Reference
 
-Use **levels_sample.csv** or **levels_sample.xlsx** as a reference for adding levels.
+Use **levels_sample.csv** or **levels_sample.xlsx** as a reference for adding levels. For **automatic** level calculation (pivot, K-Means, ATR, Bollinger, SAR, ML), see the repo root **`TRADING_ENGINE_EXPLAINED.md`** Section 4 (Levels).
 
-## Required columns
+## Required columns (for bot loader)
+
+| Column     | Description                    | Example  |
+|-----------|--------------------------------|----------|
+| `price`   | Level price (number)           | 24150    |
+| `type`    | One of the 10 level type codes | EU       |
+| `timeframe` | 1m, 5m, or 15m               | 5m       |
+
+## Optional columns
 
 | Column     | Description                    | Example  |
 |-----------|--------------------------------|----------|
 | `index`   | NIFTY, BANKNIFTY, or FINNIFTY  | NIFTY    |
-| `timeframe` | 1m, 5m, or 15m               | 5m       |
-| `type`    | One of the 10 level type codes | EU       |
-| `price`   | Level price (number)           | 24150    |
 | `stoploss`| Optional stop loss price       | 24100    |
 | `target`  | Optional target price          | 24200    |
+| `confidence` | 0–1 (used when merging/ranking) | 0.9   |
 
 ## The 10 level types
 
@@ -30,7 +36,5 @@ Use **levels_sample.csv** or **levels_sample.xlsx** as a reference for adding le
 
 ## Loading in the app
 
-- **Python bot**: Place your file as `levels/levels.csv` (or pass path).  
-  CSV: `level_manager.load_manual_levels_from_csv('levels/levels.csv')`  
-  Excel: `level_manager.load_manual_levels_from_excel('levels/levels.xlsx')`
+- **Python bot**: Set `LEVELS_FILE` in `.env` (e.g. `levels/levels.csv`). On startup the bot loads the file if it exists (required columns: `price`, `type`, `timeframe`).  
 - **GUI**: In the Trading tab, use “Add level” with the type dropdown, or “Load from file” and choose your CSV/Excel.

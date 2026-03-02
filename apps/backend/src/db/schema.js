@@ -107,6 +107,17 @@ export async function init() {
       payload_json TEXT,
       created_at TEXT DEFAULT (datetime('now'))
     );
+
+    CREATE TABLE IF NOT EXISTS trading_logs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      log_date TEXT NOT NULL,
+      timestamp TEXT NOT NULL,
+      level TEXT NOT NULL,
+      message TEXT NOT NULL,
+      payload_json TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_trading_logs_date ON trading_logs(log_date);
   `);
   return database;
 }

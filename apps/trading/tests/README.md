@@ -1,6 +1,6 @@
 # Trading tests
 
-Run from `apps/trading` (project root for trading backend). Install deps first:
+Unit tests for strategy, levels, patterns, risk, journal, position sizing, config, and data. Run from `apps/trading`. Install deps first:
 
 ```bash
 cd apps/trading
@@ -22,4 +22,4 @@ pytest tests/test_risk.py -v
 pytest tests/test_data_dummy.py -v
 ```
 
-Tests use dummy data (conftest.py). No live API or real `key.txt` required.
+Tests use dummy data (conftest.py). No live API or real `key.txt` required. For full system description and run process, see repo root **`TRADING_ENGINE_EXPLAINED.md`**.

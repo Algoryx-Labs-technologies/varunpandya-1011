@@ -56,6 +56,11 @@
   box-shadow: 0 0 14px var(--accent-red-dim);
 }
 
+.status-indicator.market-closed {
+  background: var(--accent-gold, #d4a853);
+  box-shadow: 0 0 10px rgba(212, 168, 83, 0.4);
+}
+
 /* Nav — scrollable strip, trading-style */
 .app-nav {
   background: var(--bg-elevated);

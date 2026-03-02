@@ -8,9 +8,10 @@ A comprehensive Python-based trading bot for options trading using Angel One Sma
 - **Multi-Timeframe Analysis**: Supports 1m, 5m, and 15m timeframes
 - **Support/Resistance Levels**: Both manual and AI-assisted level detection
 - **Candlestick Pattern Detection**: Uses TA-Lib for pattern recognition
-- **Risk Management**: Auto-lock, kill switch, position monitoring
-- **Trade Journal**: Comprehensive logging and analysis
-- **Backend Integration**: Communicates with React frontend via REST API
+- **Risk Management**: Auto-lock, kill switch, position monitoring, optional cycle net PnL target (stop new trades when daily PnL % reached)
+- **Exit logic**: Min 7 candles hold, then take profit or square off after 7–10 candles; stop loss always immediate
+- **Trade Journal**: Local JSON/Excel/CSV; trades and logs also sent to backend (DB + Logs tab)
+- **Backend Integration**: REST API (signals, trades, OHLC, option chain, alerts, trading logs); see repo root `TRADING_ENGINE_EXPLAINED.md` for full run process
 
 ## Installation
 
@@ -55,17 +56,10 @@ price,type,timeframe,confidence
 29200,TFU,15m,0.9
 ```
 
-Level types:
-- `EU`: Easy Up
-- `ED`: Easy Down
-- `TFU`: Trend Following Up
-- `TFD`: Trend Following Down
-- `RU`: Reversal Up
-- `RD`: Reversal Down
-- `TFRU`: Trend Following Reversal Up
-- `TFRD`: Trend Following Reversal Down
-- `EURTZ`: Easy Up Resistance Zone
-- `EDRTZ`: Easy Down Resistance Zone
+Level types (see `levels/README_LEVELS.md` for full table):
+- `EU` (Easy Up), `TFD` (Target From Down), `ED` (Easy Down), `TFU` (Target From Up)
+- `RU` (Reversal Up), `TFRU` (Target For Reversal Up), `RD` (Reversal Down), `TFRD` (Target For Reversal Down)
+- `EURTZ` (Easy Up Retest Zone), `EDRTZ` (Easy Down Retest Zone)
 
 ## Project Structure
 
@@ -97,30 +91,29 @@ apps/trading/
 
 ## Configuration
 
-Key configuration options in `config.py` and `.env`:
+Key configuration options in `config.py` and `.env` (see `.env.example` for all):
 
-- `TRADING_CAPITAL`: Total capital for trading (default: 20000)
-- `MAX_TRADES_PER_DAY`: Maximum trades before auto-lock (default: 2)
-- `KILL_SWITCH_TIME`: Time to automatically square off (default: 15:15)
-- `STOP_LOSS_PERCENTAGE`: Stop loss percentage (default: 2.0%)
-- `TARGET_PERCENTAGE`: Target percentage (default: 1.5%)
-- `CANDLES_TO_WAIT`: Candles to wait before time-based exit (default: 7)
+- `TRADING_CAPITAL`, `MAX_TRADES_PER_DAY`, `KILL_SWITCH_TIME` (e.g. 15:15)
+- `STOP_LOSS_PERCENTAGE`, `TARGET_PERCENTAGE`
+- `MIN_CANDLES_BEFORE_EXIT`: Min candles before take-profit or time-based exit (default: 7)
+- `CANDLES_BEFORE_SQUARE_OFF`: Candles after which to square off (default: 10)
+- `ENABLE_NET_PNL_TARGET`, `NET_PNL_TARGET_PERCENT`: Optional; stop new trades when daily PnL % reached
+- `BACKEND_API_URL`: Backend base URL (e.g. http://localhost:3000)
+- `LEVELS_FILE`: Path to manual levels CSV/Excel (e.g. levels/levels.csv)
 
 ## Strategy Logic
 
-1. **Signal Generation**: When a support/resistance level is broken with a valid candlestick pattern
-2. **Entry**: Place order at optimal strike based on capital allocation
-3. **Exit**: Exit when target reached, stop loss hit, or after N candles
-4. **Risk Controls**: Auto-lock after max trades, kill switch at end of day
+1. **Signal generation**: Level break + qualifying candlestick pattern (see `TRADING_ENGINE_EXPLAINED.md` Section 4 for level types).
+2. **Entry**: Strike selection from option chain (ATM/ITM/OTM per config); place order via broker.
+3. **Exit**: Stop loss immediate; take profit and time-based exit only after `MIN_CANDLES_BEFORE_EXIT` candles; square off after `CANDLES_BEFORE_SQUARE_OFF` candles.
+4. **Risk**: Auto-lock after max trades, kill switch at `KILL_SWITCH_TIME`; optional cycle PnL target.
 
 ## Integration with Backend/Frontend
 
-The trading bot communicates with the backend API at `http://localhost:3000`:
+The trading bot communicates with the backend at `BACKEND_API_URL` (e.g. http://localhost:3000):
 
-- `POST /api/trading/signals`: Send trade signals
-- `POST /api/trading/trades`: Send trade executions
-- `POST /api/trading/levels`: Send level updates
-- `POST /api/trading/market-data`: Send market data updates
+- `POST /api/trading/signals`, `/trades`, `/levels`, `/market-data`, `/ohlc`, `/option-chain`, `/alert`, `/pattern-detection`, **`/logs`** (trading log entries)
+- Backend persists trades and logs to SQLite; frontend Logs tab shows logs per day. See repo root **`TRADING_ENGINE_EXPLAINED.md`** Section 12 for full run process (including `node run-all.js`).
 
 ## Logging
 
@@ -135,7 +128,6 @@ Trades are automatically logged to:
 
 ## Notes
 
-- Ensure TA-Lib is properly installed before running
-- Test with paper trading first
-- Monitor logs for any errors
-- Backend API integration is optional - bot can run standalone
+- Credentials: use **key.txt** (one line: api_key client_secret client_code password totp_secret) or set env vars; see `.env.example`.
+- Ensure TA-Lib is properly installed for full indicator/auto-level support.
+- Backend integration is optional; without it the bot still runs but won't push data to the web UI. For full stack, run backend + frontend from repo root with `node run-all.js`, then start the bot with `BACKEND_API_URL` set to the backend port.

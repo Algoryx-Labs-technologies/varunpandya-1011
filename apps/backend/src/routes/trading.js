@@ -5,6 +5,7 @@
 import express from 'express';
 import { tradingStore } from '../store/tradingStore.js';
 import * as persistence from '../db/persistence.js';
+import { getMarketStatus } from '../utils/marketHours.js';
 
 const router = express.Router();
 
@@ -20,12 +21,13 @@ router.post('/signals', (req, res) => {
   }
 });
 
-// Store trade executions
+// Store trade executions (in-memory + DB)
 router.post('/trades', (req, res) => {
   try {
     const trade = req.body;
     tradingStore.addTrade(trade);
     tradingStore.broadcast('trade', trade);
+    persistence.saveTrade(trade).catch(() => {});
     res.json({ status: 'success', message: 'Trade recorded' });
   } catch (error) {
     res.status(500).json({ status: 'error', message: error.message });
@@ -200,6 +202,16 @@ router.get('/config', (req, res) => {
   });
 });
 
+// --- Market status (Indian trading timings, IST from system time) ---
+router.get('/market-status', (req, res) => {
+  try {
+    const status = getMarketStatus();
+    res.json({ status: 'success', data: status });
+  } catch (error) {
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+});
+
 // --- Indicators (catalog for frontend) ---
 const INDICATOR_CATALOG = [
   { id: 'atr_bands', name: 'ATR Bands', group: 'volatility', min_bars: 14, description: 'Dynamic support/resistance from ATR; close ± (ATR × multiplier).' },
@@ -334,6 +346,29 @@ router.get('/alerts', (req, res) => {
     status: 'success',
     data: tradingStore.getAlerts()
   });
+});
+
+// --- Trading logs (store and retrieve by day) ---
+router.post('/logs', async (req, res) => {
+  try {
+    const { level, message, payload } = req.body || {};
+    const entry = { level: level || 'info', message: message || '', payload: payload || {} };
+    await persistence.saveTradingLog(entry);
+    res.status(204).end();
+  } catch (error) {
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+});
+
+router.get('/logs', async (req, res) => {
+  const dateStr = req.query.date || new Date().toISOString().slice(0, 10);
+  const limit = Math.min(parseInt(req.query.limit, 10) || 500, 2000);
+  try {
+    const logs = await persistence.loadTradingLogsByDate(dateStr, limit);
+    res.json({ status: 'success', data: logs });
+  } catch (error) {
+    res.status(500).json({ status: 'error', message: error.message });
+  }
 });
 
 export default router;

@@ -67,6 +67,12 @@ class TradingStrategy:
         self.active_signals: List[TradeSignal] = []
         cw = getattr(Config, "CANDLES_TO_WAIT", 7)
         self.candles_to_wait = max(1, min(20, int(cw) if cw is not None else 7))
+        # Min candles before allowing take-profit or time-based exit (stop loss still immediate)
+        min_hold = getattr(Config, "MIN_CANDLES_BEFORE_EXIT", 7)
+        self.min_candles_before_exit = max(1, min(20, int(min_hold) if min_hold is not None else 7))
+        # Candles after which to square off (time-based exit); 7–10 typical
+        sq = getattr(Config, "CANDLES_BEFORE_SQUARE_OFF", 10)
+        self.candles_before_square_off = max(self.min_candles_before_exit, min(30, int(sq) if sq is not None else 10))
 
     def generate_signals(
         self,
@@ -251,7 +257,7 @@ class TradingStrategy:
         
         candles_since_entry = len(df) - entry_idx - 1
         
-        # Check stop loss
+        # Stop loss: always allow immediate exit (risk management)
         if signal.direction == 'call':
             if current_price <= signal.stop_loss:
                 return True, 'stop_loss', signal.stop_loss
@@ -259,7 +265,11 @@ class TradingStrategy:
             if current_price >= signal.stop_loss:
                 return True, 'stop_loss', signal.stop_loss
         
-        # Check target
+        # Minimum hold: do not take profit or square off by time until at least min_candles_before_exit (e.g. 7)
+        if candles_since_entry < self.min_candles_before_exit:
+            return False, '', 0.0
+        
+        # Take profit: allowed only after minimum candles
         if signal.direction == 'call':
             if current_price >= signal.target_price:
                 return True, 'target', signal.target_price
@@ -267,8 +277,8 @@ class TradingStrategy:
             if current_price <= signal.target_price:
                 return True, 'target', signal.target_price
         
-        # Check time-based exit (after N candles)
-        if candles_since_entry >= self.candles_to_wait:
+        # Time-based square off: after N candles (e.g. 7–10)
+        if candles_since_entry >= self.candles_before_square_off:
             return True, 'time_based', current_price
         
         return False, '', 0.0

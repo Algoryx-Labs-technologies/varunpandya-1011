@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Dashboard from './components/Dashboard';
 import TradingView from './components/TradingView';
 import SignalsPanel from './components/SignalsPanel';
@@ -11,10 +11,13 @@ import PatternAlertsPanel from './components/PatternAlertsPanel';
 import MarketIntelligencePanel from './components/MarketIntelligencePanel';
 import RiskPanel from './components/RiskPanel';
 import AlertsPanel from './components/AlertsPanel';
+import TradingLogsPanel from './components/TradingLogsPanel';
+import DiscoverPanel from './components/DiscoverPanel';
 import { useWebSocket } from './hooks/useWebSocket';
 import './App.css';
 
 const TABS = [
+  { id: 'discover', label: 'Discover' },
   { id: 'dashboard', label: 'Dashboard' },
   { id: 'trading', label: 'Trading' },
   { id: 'signals', label: 'Signals' },
@@ -27,19 +30,37 @@ const TABS = [
   { id: 'indicators', label: 'Indicators' },
   { id: 'analytics', label: 'Analytics' },
   { id: 'ai', label: 'AI' },
+  { id: 'logs', label: 'Logs' },
 ];
 
 function App() {
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTab] = useState('discover');
   const { connected, data } = useWebSocket();
+  const [marketStatus, setMarketStatus] = useState(null);
+
+  useEffect(() => {
+    const fetchMarketStatus = () => {
+      fetch('/api/trading/market-status')
+        .then((res) => res.json())
+        .then((r) => { if (r.status === 'success' && r.data) setMarketStatus(r.data); })
+        .catch(() => setMarketStatus(null));
+    };
+    fetchMarketStatus();
+    const interval = setInterval(fetchMarketStatus, 60 * 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const marketLive = marketStatus?.live ?? false;
+  const statusLabel = !connected ? 'Offline' : (marketLive ? 'Live' : 'Market closed');
+  const statusClass = !connected ? 'disconnected' : (marketLive ? 'connected' : 'market-closed');
 
   return (
     <div className="app">
       <header className="app-header">
         <h1>Vertex <span>Options</span></h1>
-        <div className="connection-status">
-          <span className={`status-indicator ${connected ? 'connected' : 'disconnected'}`} />
-          <span>{connected ? 'Live' : 'Offline'}</span>
+        <div className="connection-status" title={marketStatus?.istTime || ''}>
+          <span className={`status-indicator ${statusClass}`} />
+          <span>{statusLabel}</span>
         </div>
       </header>
 
@@ -57,6 +78,7 @@ function App() {
       </nav>
 
       <main className="app-main">
+        {activeTab === 'discover' && <DiscoverPanel />}
         {activeTab === 'dashboard' && <Dashboard data={data} />}
         {activeTab === 'trading' && <TradingView data={data} />}
         {activeTab === 'signals' && <SignalsPanel signals={data?.signals || []} />}
@@ -69,6 +91,7 @@ function App() {
         {activeTab === 'indicators' && <IndicatorsPanel />}
         {activeTab === 'analytics' && <AnalyticsPanel analytics={data?.analytics} />}
         {activeTab === 'ai' && <AIPanel missedTrades={data?.missedTrades} />}
+        {activeTab === 'logs' && <TradingLogsPanel />}
       </main>
     </div>
   );

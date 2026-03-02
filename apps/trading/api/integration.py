@@ -133,3 +133,18 @@ class BackendAPI:
         except Exception as e:
             logger.debug(f"send_alert failed: {e}")
             return False
+
+    def send_trading_log(self, level: str, message: str, payload: Optional[Dict] = None) -> bool:
+        """Send a trading log entry to backend (stored in DB, shown in web per day)."""
+        if not self.base_url:
+            return False
+        try:
+            r = self.session.post(
+                f"{self.base_url}/api/trading/logs",
+                json={"level": level or "info", "message": message or "", "payload": payload or {}},
+                timeout=TIMEOUT,
+            )
+            return r.status_code in (200, 201, 204)
+        except Exception as e:
+            logger.debug(f"send_trading_log failed: {e}")
+            return False

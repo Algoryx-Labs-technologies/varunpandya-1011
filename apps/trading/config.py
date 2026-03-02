@@ -72,8 +72,16 @@ class Config:
     STOP_LOSS_PERCENTAGE = _float_env('STOP_LOSS_PERCENTAGE', 2.0)
     TARGET_PERCENTAGE = _float_env('TARGET_PERCENTAGE', 1.5)
 
+    # Trade cycle: stop new trades when net PnL reaches target % of capital (user opt-in)
+    ENABLE_NET_PNL_TARGET = os.getenv('ENABLE_NET_PNL_TARGET', 'false').strip().lower() in ('1', 'true', 'yes')
+    NET_PNL_TARGET_PERCENT = _float_env('NET_PNL_TARGET_PERCENT', 20.0)
+
     # Strategy Parameters
     CANDLES_TO_WAIT = _int_env('CANDLES_TO_WAIT', 7)
+    # Min candles to hold before allowing take-profit or time-based square off (stop loss still immediate)
+    MIN_CANDLES_BEFORE_EXIT = _int_env('MIN_CANDLES_BEFORE_EXIT', 7)
+    # Number of candles after which to square off (time-based exit); typically 7–10
+    CANDLES_BEFORE_SQUARE_OFF = _int_env('CANDLES_BEFORE_SQUARE_OFF', 10)
     MIN_CANDLE_BODY_SIZE = _float_env('MIN_CANDLE_BODY_SIZE', 0.3)
     MIN_WICK_RATIO = _float_env('MIN_WICK_RATIO', 0.5)
     

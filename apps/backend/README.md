@@ -4,10 +4,11 @@ Custom backend API server for trading bot integration.
 
 ## Features
 
-- REST API endpoints for trading data
-- WebSocket server for real-time updates
-- In-memory data store (can be replaced with database)
-- CORS enabled for frontend integration
+- REST API for trading data (signals, trades, OHLC, option chain, levels, alerts, pattern detections, **trading logs**, **market status**)
+- WebSocket server for real-time updates to frontend
+- In-memory store plus optional **SQLite** persistence (candles, option_snapshots, trades, **trading_logs**)
+- **GET /api/trading/market-status**: Indian market hours (Live / Market closed) from system time in IST
+- CORS enabled for frontend
 
 ## Installation
 
@@ -39,21 +40,18 @@ npm start
 
 ## API Endpoints
 
-### Trading Data
+### Trading Data (POST from bot)
 
-- `POST /api/trading/signals` - Receive trade signals from bot
-- `POST /api/trading/trades` - Receive trade executions
-- `POST /api/trading/levels` - Receive level updates
-- `POST /api/trading/market-data` - Receive market data
+- `POST /api/trading/signals`, `/trades`, `/levels`, `/market-data`, `/ohlc`, `/option-chain`, `/alert`, `/pattern-detection`, **`/logs`** (body: level, message, payload; stored in DB by date)
 
 ### Get Data
 
-- `GET /api/trading/signals` - Get all signals
-- `GET /api/trading/trades` - Get all trades
-- `GET /api/trading/levels` - Get current levels
-- `GET /api/trading/market-data` - Get market data
-- `GET /api/trading/statistics` - Get trading statistics
-- `GET /api/trading/config` - Get configuration
+- `GET /api/trading/signals`, `/trades`, `/levels`, `/market-data`, `/statistics`, `/config`
+- `GET /api/trading/ohlc?index=&timeframe=&limit=` - OHLC from memory or SQLite
+- `GET /api/trading/option-chain?index=` - Option chain
+- **`GET /api/trading/logs?date=YYYY-MM-DD`** - Trading logs for that day (from SQLite)
+- **`GET /api/trading/market-status`** - Indian market hours: `{ live, message, istTime, nextOpen, nextClose }`
+- `GET /api/trading/alerts`, `/risk-status`, `/analytics`, `/ai/missed-trades`, `/pattern-detections`, `/market-intelligence`, `/indicators/catalog`
 
 ### Health
 
@@ -61,10 +59,6 @@ npm start
 
 ## WebSocket
 
-Connect to `ws://localhost:3000/ws` for real-time updates.
+Connect to `ws://localhost:<PORT>/ws` for real-time updates. When running via `node run-all.js` from repo root, the frontend proxies `/ws` and `/api` to the backend port.
 
-Message types:
-- `signal` - New trade signal
-- `trade` - Trade execution
-- `levels` - Level updates
-- `market-data` - Market data updates
+Message types broadcast to clients: `signal`, `trade`, `levels`, `market-data`, `ohlc`, `option-chain`, `alert`, `pattern-detection`, `risk-status`, `analytics`, `missed-trades`, `market-intelligence`.

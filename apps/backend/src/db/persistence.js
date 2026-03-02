@@ -70,3 +70,72 @@ export async function loadCandlesFromDb(indexName, timeframe, limit = 500) {
     return [];
   }
 }
+
+export async function saveTrade(trade) {
+  const database = await getDb();
+  if (!database || !trade) return;
+  try {
+    database.prepare(`
+      INSERT INTO trades (trade_id, index_name, symbol, direction, entry_price, exit_price, quantity, pnl, level_type, pattern, entry_time, exit_time, payload_json)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      trade.trade_id || null,
+      trade.index || trade.index_name || null,
+      trade.symbol || null,
+      trade.direction || null,
+      trade.entry_price ?? null,
+      trade.exit_price ?? null,
+      trade.quantity ?? null,
+      trade.pnl ?? null,
+      trade.level_type || null,
+      trade.pattern || null,
+      trade.entry_time || null,
+      trade.exit_time || null,
+      trade.payload_json ?? (trade.trade_id ? JSON.stringify(trade) : null)
+    );
+  } catch (e) {
+    console.warn('saveTrade:', e.message);
+  }
+}
+
+export async function saveTradingLog(entry) {
+  const database = await getDb();
+  if (!database || !entry) return;
+  const now = new Date();
+  const logDate = now.toISOString().slice(0, 10);
+  const timestamp = now.toISOString();
+  const level = entry.level || 'info';
+  const message = entry.message || '';
+  const payloadJson = entry.payload ? JSON.stringify(entry.payload) : null;
+  try {
+    database.prepare(`
+      INSERT INTO trading_logs (log_date, timestamp, level, message, payload_json)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(logDate, timestamp, level, message, payloadJson);
+  } catch (e) {
+    console.warn('saveTradingLog:', e.message);
+  }
+}
+
+export async function loadTradingLogsByDate(dateStr, limit = 500) {
+  const database = await getDb();
+  if (!database) return [];
+  try {
+    const rows = database.prepare(`
+      SELECT id, log_date, timestamp, level, message, payload_json
+      FROM trading_logs WHERE log_date = ?
+      ORDER BY timestamp ASC
+      LIMIT ?
+    `).all(dateStr, limit);
+    return rows.map(r => ({
+      id: r.id,
+      log_date: r.log_date,
+      timestamp: r.timestamp,
+      level: r.level,
+      message: r.message,
+      payload: r.payload_json ? (() => { try { return JSON.parse(r.payload_json); } catch { return null; } })() : null
+    }));
+  } catch (e) {
+    return [];
+  }
+}

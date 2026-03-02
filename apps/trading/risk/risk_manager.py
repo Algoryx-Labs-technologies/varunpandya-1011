@@ -40,6 +40,7 @@ class RiskManager:
         self.trade_count = 0
         self.max_trades = max(0, int(getattr(Config, "MAX_TRADES_PER_DAY", 2) or 2))
         self.auto_locked = False
+        self.cycle_pnl_target_reached = False  # Set when net PnL % target is hit (if opted in)
         _h, _m = _parse_kill_switch_time(getattr(Config, "KILL_SWITCH_TIME", "15:15"))
         self._kill_hour, self._kill_minute = _h, _m
         self.kill_switch_time = f"{_h:02d}:{_m:02d}"
@@ -51,14 +52,18 @@ class RiskManager:
     def can_trade(self) -> Tuple[bool, str]:
         """
         Check if trading is allowed
-        
+
         Returns:
             (allowed, reason)
         """
+        # Check cycle net PnL target (user opt-in: stop when daily PnL reaches target %)
+        if self.cycle_pnl_target_reached:
+            return False, "Cycle net PnL target reached; no new trades"
+
         # Check auto-lock
         if self.auto_locked:
             return False, "Auto-lock active (max trades reached)"
-        
+
         # Check kill switch time
         if self._is_kill_switch_time():
             return False, "Kill switch time reached"
@@ -187,7 +192,14 @@ class RiskManager:
                 time.sleep(5)
     
     def reset_daily(self):
-        """Reset daily counters"""
+        """Reset daily counters and cycle PnL target flag"""
         self.trade_count = 0
         self.auto_locked = False
+        self.cycle_pnl_target_reached = False
         logger.info("Daily risk counters reset")
+
+    def set_cycle_pnl_target_reached(self, reached: bool = True):
+        """Set when net PnL for the cycle has reached the user-configured target %."""
+        self.cycle_pnl_target_reached = reached
+        if reached:
+            logger.warning("Cycle net PnL target reached; no new trades until next cycle")
