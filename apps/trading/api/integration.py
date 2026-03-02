@@ -134,6 +134,31 @@ class BackendAPI:
             logger.debug(f"send_alert failed: {e}")
             return False
 
+    def get_unlock_request(self) -> bool:
+        """Check if user requested manual unlock (from portal). Bot should call unlock_trading() and clear."""
+        if not self.base_url:
+            return False
+        try:
+            r = self.session.get(f"{self.base_url}/api/trading/unlock-request", timeout=TIMEOUT)
+            if r.status_code != 200:
+                return False
+            data = r.json()
+            return bool(data.get("data", {}).get("unlock_requested"))
+        except Exception as e:
+            logger.debug(f"get_unlock_request: {e}")
+            return False
+
+    def clear_unlock_request(self) -> bool:
+        """Clear unlock request after bot has acted."""
+        if not self.base_url:
+            return False
+        try:
+            r = self.session.post(f"{self.base_url}/api/trading/clear-unlock-request", json={}, timeout=TIMEOUT)
+            return r.status_code in (200, 201, 204)
+        except Exception as e:
+            logger.debug(f"clear_unlock_request: {e}")
+            return False
+
     def send_trading_log(self, level: str, message: str, payload: Optional[Dict] = None) -> bool:
         """Send a trading log entry to backend (stored in DB, shown in web per day)."""
         if not self.base_url:

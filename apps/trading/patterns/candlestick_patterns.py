@@ -38,6 +38,8 @@ class CandlestickPatternDetector:
     def __init__(self):
         self.min_body_size = Config.MIN_CANDLE_BODY_SIZE
         self.min_wick_ratio = Config.MIN_WICK_RATIO
+        _max = getattr(Config, "PATTERN_MAX_BODY_SIZE", 0.0) or 0.0
+        self.max_body_size = float(_max) if _max > 0 else None
     
     def detect_patterns(self, df: pd.DataFrame) -> pd.DataFrame:
         """
@@ -92,11 +94,12 @@ class CandlestickPatternDetector:
         df['lower_wick'] = df[['open', 'close']].min(axis=1) - df['low']
         df['wick_ratio'] = (df['upper_wick'] + df['lower_wick']) / (df['high'] - df['low'] + 1e-10)
         
-        # Filter patterns based on body size
+        # Filter patterns based on body size (min and optional max for OHLC specificity)
         for col in df.columns:
             if col.startswith('pattern_'):
-                # Only keep pattern if body size meets minimum
                 mask = df['body_size'] >= self.min_body_size
+                if self.max_body_size is not None:
+                    mask = mask & (df['body_size'] <= self.max_body_size)
                 df.loc[~mask, col] = 0
         
         return df

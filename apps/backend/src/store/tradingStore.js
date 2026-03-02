@@ -14,6 +14,7 @@ class TradingStore {
     this.patternDetections = [];  // candlestick pattern detected → shown as alert, then signal/trade
     this.marketIntelligence = null;  // PCR, OI momentum, vol, trend, filter_score (from bot)
     this.riskStatus = null;         // trade_count, max_trades, auto_locked, kill_switch_time
+    this.unlockRequested = false;   // user requested manual unlock; bot clears after acting
     this.ohlc = {};                 // { NIFTY: { '5m': [{ time, open, high, low, close, volume }] } }
     this.optionChain = {};          // { NIFTY: { timestamp, underlying_value, calls, puts } }
     this.wsClients = [];
@@ -145,6 +146,14 @@ class TradingStore {
 
   getRiskStatus() {
     return this.riskStatus;
+  }
+
+  setUnlockRequested(value) {
+    this.unlockRequested = Boolean(value);
+  }
+
+  getUnlockRequested() {
+    return this.unlockRequested;
   }
 
   getStatistics() {

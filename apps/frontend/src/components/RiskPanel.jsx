@@ -15,11 +15,19 @@ function RiskPanel({ riskStatus: riskFromWs }) {
       .catch(() => {});
   }, [riskFromWs]);
 
+  const [unlockRequested, setUnlockRequested] = useState(false);
   const tradeCount = risk?.trade_count ?? 0;
   const maxTrades = risk?.max_trades ?? 2;
   const autoLocked = risk?.auto_locked ?? false;
   const killSwitchTime = risk?.kill_switch_time ?? '15:15';
   const canTrade = !autoLocked && tradeCount < maxTrades;
+
+  const handleRequestUnlock = () => {
+    fetch('/api/trading/request-unlock', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+      .then((res) => res.json())
+      .then((r) => { if (r.status === 'success') setUnlockRequested(true); })
+      .catch(() => {});
+  };
 
   return (
     <div className="risk-panel">
@@ -44,6 +52,15 @@ function RiskPanel({ riskStatus: riskFromWs }) {
           <span className="risk-card-value mono">{killSwitchTime}</span>
         </div>
       </div>
+
+      {autoLocked && (
+        <div className="unlock-section">
+          <button type="button" className="unlock-btn" onClick={handleRequestUnlock} disabled={unlockRequested}>
+            {unlockRequested ? 'Unlock requested' : 'Unlock trading'}
+          </button>
+          {unlockRequested && <p className="unlock-hint">Bot will clear auto-lock on its next loop.</p>}
+        </div>
+      )}
 
       {!risk && (
         <p className="empty-hint">No risk status from bot yet. Use POST /api/trading/risk-status to push trade_count, max_trades, auto_locked, kill_switch_time.</p>

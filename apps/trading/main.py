@@ -100,6 +100,12 @@ class TradingBot:
                     self._cycle_net_pnl = 0.0
                     self.risk_manager.reset_daily()
 
+                # Honor manual unlock request from portal (user clicked Unlock)
+                if self.backend_api.get_unlock_request():
+                    self.risk_manager.unlock_trading()
+                    self.backend_api.clear_unlock_request()
+                    logger.info("Manual unlock applied (request from portal)")
+
                 # Check if trading is allowed
                 can_trade, reason = self.risk_manager.can_trade()
                 if not can_trade:
@@ -205,12 +211,14 @@ class TradingBot:
                 logger.error(f"Could not fetch option chain for {index}")
                 return
 
-            # Select strike from real-time option chain (ATM/ITM/OTM best return)
+            # Select strike from real-time option chain (user daily list if set, else ATM/ITM/OTM best return)
+            daily_strikes = Config.get_daily_strikes(index)
             result = self.position_sizer.select_strike_from_option_chain(
                 option_chain=option_chain,
                 index=index,
                 direction=signal.direction,
                 preference=getattr(Config, 'STRIKE_PREFERENCE', 'best_return'),
+                allowed_strikes=daily_strikes,
             )
 
             if not result:

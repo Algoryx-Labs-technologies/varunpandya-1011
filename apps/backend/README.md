@@ -52,6 +52,9 @@ npm start
 - **`GET /api/trading/logs?date=YYYY-MM-DD`** - Trading logs for that day (from SQLite)
 - **`GET /api/trading/market-status`** - Indian market hours: `{ live, message, istTime, nextOpen, nextClose }`
 - `GET /api/trading/alerts`, `/risk-status`, `/analytics`, `/ai/missed-trades`, `/pattern-detections`, `/market-intelligence`, `/indicators/catalog`
+- **`GET /api/trading/unlock-request`** – Returns `{ unlock_requested: boolean }` (bot polls to honour manual unlock)
+- **`POST /api/trading/request-unlock`** – Set unlock request (user clicked Unlock in Risk tab)
+- **`POST /api/trading/clear-unlock-request`** – Clear unlock request (called by bot after applying unlock)
 
 ### Health
 

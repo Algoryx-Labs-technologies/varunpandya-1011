@@ -340,6 +340,25 @@ router.get('/risk-status', (req, res) => {
   });
 });
 
+// --- Manual unlock (user requests unlock; bot polls and clears)
+router.get('/unlock-request', (req, res) => {
+  res.json({
+    status: 'success',
+    data: { unlock_requested: tradingStore.getUnlockRequested() }
+  });
+});
+
+router.post('/request-unlock', (req, res) => {
+  tradingStore.setUnlockRequested(true);
+  tradingStore.broadcast('risk-status', { ...tradingStore.getRiskStatus(), unlock_requested: true });
+  res.json({ status: 'success', message: 'Unlock requested; bot will clear auto-lock on next loop.' });
+});
+
+router.post('/clear-unlock-request', (req, res) => {
+  tradingStore.setUnlockRequested(false);
+  res.json({ status: 'success', message: 'Unlock request cleared' });
+});
+
 // --- Alerts (get all: pattern + system) ---
 router.get('/alerts', (req, res) => {
   res.json({

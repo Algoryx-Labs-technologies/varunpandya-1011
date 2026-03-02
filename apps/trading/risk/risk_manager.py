@@ -118,47 +118,11 @@ class RiskManager:
             return False
     
     def execute_kill_switch(self):
-        """Execute kill switch: cancel all orders and square off positions. Alert on execution."""
+        """Execute kill switch: cancel all orders, square off all positions at LTP, wait 30s, then lock."""
         logger.warning("Executing kill switch...")
         alert(ALERT_CRITICAL, "Kill switch executed", {"time": datetime.now().isoformat()})
         try:
-            open_orders = self.broker.get_all_open_orders() or []
-            for order in open_orders:
-                order_id = order.get('orderid') or order.get('order_id')
-                if order_id:
-                    self.broker.cancel_order(str(order_id))
-                    logger.info(f"Cancelled order: {order_id}")
-            
-            positions = self.broker.get_position() or []
-            for position in positions:
-                symbol = position.get('tradingsymbol') or position.get('symbol')
-                token = position.get('symboltoken') or position.get('token')
-                quantity = int(position.get('netqty', 0))
-                
-                if quantity != 0:
-                    # Get current LTP
-                    ltp = self.broker.get_ltp(Config.EXCHANGE, str(token)) if token else None
-                    if ltp is not None and float(ltp) > 0:
-                        if quantity > 0:
-                            # Sell to square off long position
-                            self.broker.place_sell_order(
-                                symbol=symbol,
-                                token=str(token),
-                                quantity=abs(quantity),
-                                price=ltp * 0.99,  # Slightly below market for quick fill
-                                order_type="MARKET"
-                            )
-                        else:
-                            # Buy to square off short position
-                            self.broker.place_buy_order(
-                                symbol=symbol,
-                                token=str(token),
-                                quantity=abs(quantity),
-                                price=ltp * 1.01,  # Slightly above market
-                                order_type="MARKET"
-                            )
-                        logger.info(f"Squared off position: {symbol} qty={quantity}")
-            
+            self.broker.squareoff(exchange=Config.EXCHANGE, wait_seconds=30)
             with self._lock:
                 self.auto_locked = True
             logger.info("Kill switch executed successfully")

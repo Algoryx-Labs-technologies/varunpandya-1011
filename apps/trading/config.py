@@ -84,13 +84,23 @@ class Config:
     MIN_CANDLES_BEFORE_EXIT = _int_env('MIN_CANDLES_BEFORE_EXIT', 7)
     # Target candles (e.g. 7 or 10): square off trade after this many candles
     CANDLES_BEFORE_SQUARE_OFF = _int_env('CANDLES_BEFORE_SQUARE_OFF', 10)
+    # Candlestick pattern filters: tune to make pattern detection more/less strict (open/high/low/close effect via body/wick)
     MIN_CANDLE_BODY_SIZE = _float_env('MIN_CANDLE_BODY_SIZE', 0.3)
     MIN_WICK_RATIO = _float_env('MIN_WICK_RATIO', 0.5)
+    PATTERN_MAX_BODY_SIZE = _float_env('PATTERN_MAX_BODY_SIZE', 0.0)  # 0 = no max; set e.g. 0.6 to exclude very large bodies
     
     # Strike selection: 'best_return' | 'atm' | 'itm' | 'otm'
     _STRIKE_PREF_VALID = ('best_return', 'atm', 'itm', 'otm')
     _strike_pref = (os.getenv('STRIKE_PREFERENCE') or 'best_return').strip().lower()
     STRIKE_PREFERENCE = _strike_pref if _strike_pref in _STRIKE_PREF_VALID else 'best_return'
+    # Optional daily strike list (comma-separated). If set, only these strikes are used for selection.
+    # e.g. DAILY_STRIKES_NIFTY=29050,29100,29150,29200
+    _daily_strikes_raw = {
+        'NIFTY': os.getenv('DAILY_STRIKES_NIFTY', '').strip(),
+        'BANKNIFTY': os.getenv('DAILY_STRIKES_BANKNIFTY', '').strip(),
+        'FINNIFTY': os.getenv('DAILY_STRIKES_FINNIFTY', '').strip(),
+    }
+
     # Lot sizes per index (NSE)
     LOT_SIZES = {'NIFTY': 50, 'BANKNIFTY': 25, 'FINNIFTY': 25}
     
@@ -140,3 +150,17 @@ class Config:
             'FINNIFTY': cls.FINNIFTY_ALLOCATION
         }
         return allocations.get(index, 0.0) * cls.TRADING_CAPITAL
+
+    @classmethod
+    def get_daily_strikes(cls, index: str):
+        """
+        Optional user-provided strike list for the day (e.g. 29050,29100,29150,29200).
+        Returns list of floats or None if not set; when set, strike selection uses only these strikes.
+        """
+        raw = cls._daily_strikes_raw.get((index or '').strip().upper(), '').strip()
+        if not raw:
+            return None
+        try:
+            return [float(x.strip()) for x in raw.split(',') if x.strip()]
+        except (ValueError, TypeError):
+            return None

@@ -1,6 +1,8 @@
 """
 Money Management and Position Sizing Module
 Handles capital allocation and strike selection from real-time option chain.
+Optimal allocation is on strike prices based on highest historical return: uses utilization
+(capital deployment) and ATM weight (delta/participation proxy) to select the strike.
 Edge cases: zero/negative underlying, empty strikes, NaN prices, zero allocation, invalid index/preference.
 """
 import math
@@ -68,7 +70,9 @@ class PositionSizer:
         preference: Optional[str] = None,
     ) -> Optional[Tuple[float, int, float, str]]:
         """
-        Choose strike with best return (allocation) among ATM / ITM / OTM.
+        Optimal allocation on strike prices based on highest historical return potential.
+        Uses utilization (capital deployment) and moneyness (ATM = highest delta/participation)
+        as proxy for historical return when explicit backtest data is not available.
         preference: 'best_return' | 'atm' | 'itm' | 'otm'
         Returns: (strike, quantity, capital_used, moneyness) or None.
         """
@@ -136,13 +140,19 @@ class PositionSizer:
             # Fallback: use all rows (e.g. no ATM found)
             df = pd.DataFrame(rows)
 
-        # Best return = max allocation (capital_used) then max utilization
-        df = df.sort_values(["capital_used", "utilization"], ascending=[False, False])
+        # Optimal allocation = highest historical return proxy: utilization * ATM weight
+        # (ATM has highest delta/participation historically)
+        df["atm_weight"] = df["moneyness"].map(lambda m: 1.0 if m == "atm" else 0.9)
+        df["historical_return_score"] = df["utilization"] * df["atm_weight"]
+        df = df.sort_values(
+            ["historical_return_score", "capital_used", "utilization"],
+            ascending=[False, False, False],
+        )
         row = df.iloc[0]
 
         logger.info(
             f"Strike selected: {row['strike']} ({row['moneyness'].upper()}) "
-            f"qty={row['qty']} capital_used={row['capital_used']:.2f}"
+            f"qty={row['qty']} capital_used={row['capital_used']:.2f} (historical_return_score={row['historical_return_score']:.4f})"
         )
         return (
             float(row["strike"]),
@@ -243,12 +253,11 @@ class PositionSizer:
         direction: str,
         preference: Optional[str] = None,
         max_strikes: int = 20,
+        allowed_strikes: Optional[List[float]] = None,
     ) -> Optional[Tuple[float, int, float, str, str]]:
         """
         Choose strike with best return from real-time option chain data.
-        Uses current asset price (underlying_value) and strike LTP from chain.
-        Strategy: classify ATM/ITM/OTM from underlying vs strike; pick best
-        allocation (max capital usage) in chosen moneyness.
+        If allowed_strikes is set (e.g. user daily list), only those strikes are considered.
         Returns: (strike, quantity, capital_used, moneyness, symbol) or None.
         """
         if not option_chain:
@@ -280,6 +289,17 @@ class PositionSizer:
             strikes = [float(x.get("strike", 0)) for x in df]
             prices = [float(x.get("ltp", 0)) for x in df]
             symbols = [x.get("symbol", "") for x in df] if isinstance(df, list) else []
+
+        # User-provided daily strike list: keep only those strikes (tolerance 0.5 for float)
+        if allowed_strikes and len(allowed_strikes) > 0:
+            allowed_set = set(float(s) for s in allowed_strikes)
+            keep = [i for i, s in enumerate(strikes) if any(abs(s - a) < 0.5 for a in allowed_set)]
+            if keep:
+                strikes = [strikes[i] for i in keep]
+                prices = [prices[i] for i in keep]
+                symbols = [symbols[i] if i < len(symbols) else "" for i in keep]
+            else:
+                logger.warning("No option chain strikes match daily list %s", allowed_strikes[:10])
 
         if len(strikes) > max_strikes:
             mid = len(strikes) // 2

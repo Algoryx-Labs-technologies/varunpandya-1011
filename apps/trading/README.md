@@ -93,10 +93,13 @@ apps/trading/
 
 Key configuration options in `config.py` and `.env` (see `.env.example` for all):
 
-- `TRADING_CAPITAL`, `MAX_TRADES_PER_DAY`, `KILL_SWITCH_TIME` (e.g. 15:15)
+- `TRADING_CAPITAL`, `MAX_TRADES_PER_DAY`, `TRADE_CYCLES`, `TRADES_PER_CYCLE`, `KILL_SWITCH_TIME` (e.g. 15:15)
 - `STOP_LOSS_PERCENTAGE`, `TARGET_PERCENTAGE`
 - `MIN_CANDLES_BEFORE_EXIT`: Min candles before take-profit or time-based exit (default: 7)
-- `CANDLES_BEFORE_SQUARE_OFF`: Candles after which to square off (default: 10)
+- `CANDLES_BEFORE_SQUARE_OFF`: Target candles for square off (default: 10)
+- `MIN_CANDLE_BODY_SIZE`, `MIN_WICK_RATIO`, `PATTERN_MAX_BODY_SIZE`: Candlestick pattern filters (tune for stricter/looser detection)
+- `STRIKE_PREFERENCE`: `best_return` | `atm` | `itm` | `otm`
+- `DAILY_STRIKES_NIFTY`, `DAILY_STRIKES_BANKNIFTY`, `DAILY_STRIKES_FINNIFTY`: Optional comma-separated strike list (e.g. `29050,29100,29150,29200`); when set, only these strikes are used
 - `ENABLE_NET_PNL_TARGET`, `NET_PNL_TARGET_PERCENT`: Optional; stop new trades when daily PnL % reached
 - `BACKEND_API_URL`: Backend base URL (e.g. http://localhost:3000)
 - `LEVELS_FILE`: Path to manual levels CSV/Excel (e.g. levels/levels.csv)
@@ -104,9 +107,9 @@ Key configuration options in `config.py` and `.env` (see `.env.example` for all)
 ## Strategy Logic
 
 1. **Signal generation**: Level break + qualifying candlestick pattern (see `TRADING_ENGINE_EXPLAINED.md` Section 4 for level types).
-2. **Entry**: Strike selection from option chain (ATM/ITM/OTM per config); place order via broker.
+2. **Entry**: Strike selection from option chain—**optimal allocation on strike prices based on highest historical return** (utilization × ATM weight when `STRIKE_PREFERENCE=best_return`); or user daily list via `DAILY_STRIKES_*`, or fixed `atm`/`itm`/`otm`; place order via broker.
 3. **Exit**: Stop loss immediate; take profit and time-based exit only after `MIN_CANDLES_BEFORE_EXIT` candles; square off after `CANDLES_BEFORE_SQUARE_OFF` candles.
-4. **Risk**: Auto-lock after max trades, kill switch at `KILL_SWITCH_TIME`; optional cycle PnL target.
+4. **Risk**: Auto-lock after max trades; **manual unlock** via Risk tab (Unlock trading) – bot polls backend and clears lock. Kill switch at `KILL_SWITCH_TIME` (broker `squareoff()`); optional cycle PnL target.
 
 ## Integration with Backend/Frontend
 

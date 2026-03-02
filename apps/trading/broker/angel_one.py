@@ -2,6 +2,7 @@
 Angel One SmartAPI Integration Module
 Handles authentication, order placement, and position management
 """
+import time
 import pyotp
 from smartapi import SmartConnect
 from typing import Dict, List, Optional, Any
@@ -158,7 +159,7 @@ class AngelOneBroker:
             return None
     
     def get_all_open_orders(self) -> List[Dict]:
-        """Get all open orders"""
+        """Get all open orders (returns list of dicts). Use get_all_open_orders_as_df() for DataFrame."""
         try:
             response = self.obj.orderBook()
             if response and response.get('status'):
@@ -167,7 +168,17 @@ class AngelOneBroker:
         except Exception as e:
             logger.error(f"Error getting open orders: {str(e)}")
             return []
-    
+
+    def get_all_open_orders_as_df(self):
+        """Get all pending orders as a pandas DataFrame. Returns empty DataFrame on error or no pandas."""
+        try:
+            import pandas as pd
+            data = self.get_all_open_orders()
+            return pd.DataFrame(data) if data else pd.DataFrame()
+        except Exception as e:
+            logger.debug(f"get_all_open_orders_as_df: {e}")
+            return None
+
     def get_position(self) -> List[Dict]:
         """Get current positions"""
         try:
@@ -258,7 +269,43 @@ class AngelOneBroker:
         except Exception as e:
             logger.error(f"Error cancelling all orders: {str(e)}")
             return 0
-    
+
+    def squareoff(self, exchange: str = None, wait_seconds: int = 30) -> int:
+        """
+        Square off all open positions at LTP. Cancels open orders, places opposite orders
+        at LTP for each position, waits, then logs current positions.
+        Returns number of positions squared off.
+        """
+        exchange = exchange or getattr(Config, "EXCHANGE", "NSE")
+        try:
+            self.cancel_all()
+            positions = self.get_position() or []
+            squared = 0
+            for position in positions:
+                symbol = position.get("tradingsymbol") or position.get("symbol")
+                token = position.get("symboltoken") or position.get("token")
+                quantity = int(position.get("netqty", 0))
+                if quantity == 0:
+                    continue
+                ltp = self.get_ltp(exchange, str(token)) if token else None
+                if ltp is None or float(ltp) <= 0:
+                    logger.warning(f"squareoff: no LTP for {symbol}, skip")
+                    continue
+                if quantity > 0:
+                    self.place_sell_order(symbol, str(token), abs(quantity), float(ltp) * 0.99, "LIMIT")
+                else:
+                    self.place_buy_order(symbol, str(token), abs(quantity), float(ltp) * 1.01, "LIMIT")
+                squared += 1
+                logger.info(f"Squared off {symbol} qty={quantity} at ~{ltp}")
+            if wait_seconds > 0:
+                time.sleep(wait_seconds)
+            remaining = self.get_position() or []
+            logger.info(f"Positions after squareoff (wait {wait_seconds}s): {len(remaining)}")
+            return squared
+        except Exception as e:
+            logger.error(f"squareoff error: {e}")
+            return 0
+
     def logout(self):
         """Logout from Angel One API"""
         try:

@@ -13,9 +13,11 @@ Production-grade, institutional-level intraday options trading system for Nifty/
   - `connect()` - Authenticate with TOTP
   - `place_buy_order()` / `place_sell_order()` - Order placement
   - `cancel_order()` / `cancel_all()` - Order cancellation
+  - `get_all_open_orders()` - List of pending orders; `get_all_open_orders_as_df()` - Same as DataFrame (when pandas available)
   - `get_position()` / `get_tradebook()` - Position and trade data
   - `get_ltp()` - Last traded price
   - `get_historical_data()` - OHLC data fetching
+  - `squareoff(exchange, wait_seconds=30)` - Cancel all orders, square all positions at LTP, wait, log positions (used by kill switch)
 
 ### 2. Data Engine (`data/data_fetcher.py`)
 - **Multi-timeframe Support**: 1m, 5m, 15m
@@ -80,7 +82,7 @@ Production-grade, institutional-level intraday options trading system for Nifty/
 - **Features**:
   - Vectorized detection
   - Pattern confirmation at candle i
-  - Custom OHLC thresholds via UI
+  - Configurable OHLC filters: `MIN_CANDLE_BODY_SIZE`, `MIN_WICK_RATIO`, `PATTERN_MAX_BODY_SIZE` (env) for stricter/looser detection
   - Multi-candle pattern support
 
 ### 5. Strategy Engine (`strategy/trading_strategy.py`)
@@ -99,24 +101,21 @@ Production-grade, institutional-level intraday options trading system for Nifty/
   - **Time-based square off**: After target candles (`CANDLES_BEFORE_SQUARE_OFF`, e.g. 7 or 10), exit at market if still in trade.
 
 ### 6. Strike Selection Engine (`money/position_sizing.py`)
-- **Manual Mode**: User provides daily strikes list
-- **Auto Mode**: ATM or highest OI strike
+- **Optimal allocation on strike prices based on highest historical return**: Selection uses a **historical return score** = utilization × ATM weight (ATM = 1.0, ITM/OTM = 0.9) so that the chosen strike maximizes participation and favors ATM (highest delta/return potential).
+- **User daily strikes** (optional): Set `DAILY_STRIKES_NIFTY`, `DAILY_STRIKES_BANKNIFTY`, `DAILY_STRIKES_FINNIFTY` (comma-separated); when set, only these strikes are considered.
+- **Auto from option chain**: Otherwise uses full/ATM window from live option chain.
 - **Selection Logic**:
-  - Fetch LTP of each strike
-  - Compute quantity: `qty = floor(capital / price)`
-  - Choose strike with maximum capital utilization
-  - Consider lot size requirements
+  - Preference: `best_return` (highest historical return proxy) | `atm` | `itm` | `otm` (`STRIKE_PREFERENCE`)
+  - Compute quantity: `qty = floor(allocation / price)` per lot size
+  - Rank by historical_return_score (utilization × atm_weight), then capital_used
   - Vectorized selection
 
 ### 7. Risk Engine (`risk/risk_manager.py`)
 - **Trade cycles**: `TRADE_CYCLES` (default 2) per day; `TRADES_PER_CYCLE` (default 2). When a cycle completes (e.g. after trade 2, cycle 1), an **alert** and **trading log** are sent ("Trade cycle N completed – all trades for this cycle are done").
 - **Auto Lock**: After `MAX_TRADES_PER_DAY` (default 4); no new trades until next day (or manual unlock).
-- **Kill Switch**: At `KILL_SWITCH_TIME` (e.g. 15:15 IST)
-  - Cancel all open orders
-  - Square off positions
-  - Set auto-lock
+- **Kill Switch**: At `KILL_SWITCH_TIME` (e.g. 15:15 IST) – calls broker `squareoff()` (cancel all, square at LTP, wait 30s), then set auto-lock.
 - **Cycle net PnL target** (opt-in): If `ENABLE_NET_PNL_TARGET=true`, when daily PnL as % of capital ≥ `NET_PNL_TARGET_PERCENT` (e.g. 20%), no new trades until next day.
-- **Manual Unlock**: `risk_manager.unlock_trading()` / reset_daily().
+- **Manual Unlock**: User clicks **Unlock trading** in Risk tab → backend sets unlock request → bot polls `GET /api/trading/unlock-request`, calls `unlock_trading()`, clears request. Trading resumes on next loop.
 
 ### 8. Multithreading (`execution/execution_engine.py`)
 - **Threads**:

@@ -47,8 +47,14 @@ The system has **three main parts**:
 | **DataFetcher** | `data/data_fetcher.py` | Uses broker to get current price and OHLC for indices and timeframes. |
 | **LevelManager** | `levels/level_manager.py` | Holds manual levels (CSV/Excel) and/or auto-levels computed from OHLC. |
 | **TradingStrategy** | `strategy/trading_strategy.py` | Generates signals from levels + patterns; checks exit conditions (SL, target, candles). |
-| **CandlestickPatternDetector** | `patterns/candlestick_patterns.py` | Detects patterns (e.g. bullish/bearish) and level breaks. |
-| **PositionSizer** | `money/position_sizing.py` | Selects strike and quantity from option chain (ATM/ITM/OTM, capital). |
+| **CandlestickPatternDetector** | `patterns/candlestick_patterns.py` | Detects patterns (e.g. bullish/bearish) and level breaks; uses MIN_CANDLE_BODY_SIZE, MIN_WICK_RATIO, optional PATTERN_MAX_BODY_SIZE. |
+
+### 2.2 Broker (Angel One)
+
+- **Orders:** `place_buy_order`, `place_sell_order`, `cancel_order`, `cancel_all`, `get_all_open_orders` (list), `get_all_open_orders_as_df()` (pandas DataFrame when pandas available).
+- **Positions & data:** `get_position`, `get_tradebook`, `get_ltp`, `get_historical_data`.
+- **Square off:** `squareoff(exchange, wait_seconds=30)` cancels all open orders, squares every position at LTP, waits, then logs remaining positions. Used by kill switch.
+| **PositionSizer** | `money/position_sizing.py` | Optimal allocation on strike prices based on highest historical return (utilization × ATM weight); selects strike and quantity from option chain. |
 | **RiskManager** | `risk/risk_manager.py` | Enforces max trades per day, kill-switch time, cycle PnL target (opt-in), auto-lock. |
 | **TradeJournal** | `journal/trade_journal.py` | Appends trades locally (JSON/CSV/Excel), computes stats. |
 | **BackendAPI** | `api/integration.py` | HTTP client to backend: sends signals, trades, OHLC, option chain, alerts, logs. |
@@ -85,7 +91,7 @@ For each index, **`_process_index(index)`** runs:
 5. **Execute new signals** – For each signal whose ID is not already in **active_trades**, **`_execute_signal(signal, index, current_price)`**:
    - Calls **can_trade()** again.
    - Fetches **option chain** for the index.
-   - **PositionSizer** selects strike (ATM/ITM/OTM per `STRIKE_PREFERENCE`) and quantity from the option chain.
+   - **PositionSizer** selects strike and quantity from the option chain: **optimal allocation is on strike prices based on highest historical return** (uses utilization and ATM-weight proxy; or `STRIKE_PREFERENCE` atm/itm/otm).
    - Sends **pattern detection** to the backend (for alerts/UI).
    - **Broker**: places buy (call) or sell (put) order with the chosen strike and quantity.
    - On success: marks signal as executed, stores it in **active_trades**, **risk_manager.record_trade()**, updates capital in position sizer, sends signal to backend.
@@ -289,8 +295,9 @@ So automatic levels get refined to **EU / ED / TFU / TFD** depending on where pr
 ### 5.1 RiskManager (`risk/risk_manager.py`)
 
 - **Trade cycles** – The day is split into **TRADE_CYCLES** (default **2**) cycles. Each cycle allows up to **TRADES_PER_CYCLE** (default **2**) trades (e.g. 2 × 2 = 4 total per day). When a cycle completes (e.g. after trade 2, cycle 1 is done), an **alert** and **trading log** are sent so the user is notified ("Trade cycle 1 completed – all trades for this cycle are done").
-- **Max trades per day** – `MAX_TRADES_PER_DAY` (e.g. 4). When reached, **auto_locked** is set and **can_trade()** returns false until the next day (or manual unlock).
-- **Kill-switch time** – `KILL_SWITCH_TIME` (e.g. 15:15). After this time, **can_trade()** returns false. A background thread can call **execute_kill_switch()** to cancel open orders and square off positions.
+- **Max trades per day** – `MAX_TRADES_PER_DAY` (e.g. 4). When reached, **auto_locked** is set and **can_trade()** returns false until the next day or **manual unlock**.
+- **Manual unlock** – User can click **Unlock trading** in the Risk tab when auto-locked. The backend sets an unlock request; the bot polls **GET /api/trading/unlock-request** each loop and, when requested, calls **unlock_trading()** and clears the request. Trading can then resume within one loop.
+- **Kill-switch time** – `KILL_SWITCH_TIME` (e.g. 15:15). After this time, **can_trade()** returns false. A background thread calls **execute_kill_switch()**, which uses the broker’s **squareoff()** (cancel all orders, square all positions at LTP, wait 30s, then lock).
 - **Cycle net PnL target (opt-in)** – If **ENABLE_NET_PNL_TARGET** is true and daily net PnL (as % of **TRADING_CAPITAL**) reaches **NET_PNL_TARGET_PERCENT** (e.g. 20%), **cycle_pnl_target_reached** is set. Then **can_trade()** returns false until **reset_daily()** (next calendar day).
 
 ### 5.2 Trade cycle (daily PnL target)
@@ -326,6 +333,9 @@ So automatic levels get refined to **EU / ED / TFU / TFD** depending on where pr
 | GET `/logs?date=YYYY-MM-DD` | Return trading logs for that day from SQLite. |
 | GET `/market-status` | Return Indian market status (Live / Market closed) from system time in IST. |
 | GET `/alerts`, `/risk-status`, `/analytics`, `/ai/missed-trades`, `/pattern-detections`, `/market-intelligence` | Return respective cached data. |
+| GET `/unlock-request` | Return `{ unlock_requested: boolean }` for bot to honour manual unlock. |
+| POST `/request-unlock` | Set unlock request (user clicked Unlock in Risk tab); bot clears on next loop. |
+| POST `/clear-unlock-request` | Clear unlock request (called by bot after applying unlock). |
 
 ### 6.2 WebSocket
 
@@ -345,6 +355,7 @@ So automatic levels get refined to **EU / ED / TFU / TFD** depending on where pr
 - **Tabs:** Dashboard, Trading (chart + levels + option chain), Signals, Trades, Patterns, Intelligence, Risk, Alerts, Statistics, Indicators, Analytics, AI, **Logs**.
 - **Dashboard:** Overview stats (total trades, win rate, P&amp;L, etc.), recent signals, pattern alerts.
 - **Trading:** Price chart (OHLC), manual/server levels, option chain panel.
+- **Risk:** Trade count, max trades, auto-lock status, kill-switch time. When auto-locked, an **Unlock trading** button appears; clicking it requests unlock and the bot clears the lock on its next loop.
 - **Logs:** Date picker; GET `/api/trading/logs?date=YYYY-MM-DD`; list of log entries (time, level, message, optional payload).
 
 ---
@@ -391,6 +402,10 @@ Relevant **env / config** (see `apps/trading/config.py` and `.env.example`):
 | **CANDLES_TO_WAIT** | 7 | Used in strategy (e.g. pattern wait). |
 | **MIN_CANDLES_BEFORE_EXIT** | 7 | Min candles before take-profit or time-based exit. |
 | **CANDLES_BEFORE_SQUARE_OFF** | 10 | Target candles (e.g. 7 or 10): square off trade after this many candles. |
+| **MIN_CANDLE_BODY_SIZE**, **MIN_WICK_RATIO** | 0.3, 0.5 | Candlestick pattern filters (body/wick) for entry; tune for stricter/looser detection. |
+| **PATTERN_MAX_BODY_SIZE** | 0 | Optional max body size (e.g. 0.6) to exclude very large candles from pattern match; 0 = no max. |
+| **STRIKE_PREFERENCE** | best_return | Strike selection: `best_return` = optimal allocation by **highest historical return** (utilization × ATM weight); or `atm`, `itm`, `otm`. |
+| **DAILY_STRIKES_NIFTY**, **DAILY_STRIKES_BANKNIFTY**, **DAILY_STRIKES_FINNIFTY** | (empty) | Optional comma-separated strike list (e.g. `29050,29100,29150,29200`); when set, only these strikes are used for selection. |
 | **LEVELS_FILE** | levels/levels.csv | Manual levels file (CSV or Excel). |
 | **BACKEND_API_URL** | http://localhost:3000 | Backend base URL for the bot. |
 | **TIMEFRAMES** | 1m, 5m, 15m | OHLC timeframes. |

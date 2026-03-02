@@ -6,7 +6,7 @@ Custom React frontend for the trading bot dashboard.
 
 - Real-time WebSocket updates (signals, trades, OHLC, option chain, alerts, etc.)
 - **Market status**: Live / Market closed / Offline (from backend Indian market hours IST)
-- Dashboard, Trading (chart + levels + option chain), Signals, Trades, Patterns, Intelligence, Risk, Alerts, Statistics, Indicators, Analytics, AI, **Logs** (trading logs per day)
+- Dashboard, Trading (chart + levels + option chain), Signals, Trades, Patterns, Intelligence, **Risk** (trade limits, auto-lock, **Unlock trading** button when locked), Alerts, Statistics, Indicators, Analytics, AI, **Logs** (trading logs per day)
 - Responsive design; proxy to backend when using Vite dev (e.g. via `node run-all.js` from repo root)
 
 ## Installation
