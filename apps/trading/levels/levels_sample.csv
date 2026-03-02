@@ -1,0 +1,11 @@
+index,timeframe,type,price,stoploss,target,description
+NIFTY,5m,EU,24150,24100,24200,Easy Up - Buy Call on break
+NIFTY,5m,TFD,24200,,,Target From Down - Exit EU
+NIFTY,5m,ED,24100,24150,24050,Easy Down - Buy Put
+NIFTY,5m,TFU,24050,,,Target From Up - Exit ED
+NIFTY,5m,RU,24080,24050,24120,Reversal Up - Buy Call
+NIFTY,5m,TFRU,24120,,,Target For Reversal Up - Exit RU
+NIFTY,5m,RD,24120,24150,24080,Reversal Down - Buy Put
+NIFTY,5m,TFRD,24080,,,Target For Reversal Down - Exit RD
+NIFTY,5m,EURTZ,24150,24100,24200,Easy Up Retest Zone - 2 trades same strike
+NIFTY,5m,EDRTZ,24100,24150,24050,Easy Down Retest Zone - 2 trades same strike

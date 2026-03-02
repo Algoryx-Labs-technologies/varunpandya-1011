@@ -1,0 +1,36 @@
+"""
+Tests for config and key.txt loading (no real secrets).
+Run from apps/trading: pytest tests/test_config.py -v
+"""
+import pytest
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from config import Config, load_key_file
+
+
+class TestConfig:
+    def test_get_allocation(self):
+        # Default allocations sum to 1.0 for NIFTY+BANKNIFTY
+        n = Config.get_allocation("NIFTY")
+        b = Config.get_allocation("BANKNIFTY")
+        f = Config.get_allocation("FINNIFTY")
+        assert n >= 0 and b >= 0 and f >= 0
+
+    def test_lot_sizes(self):
+        lot = getattr(Config, "LOT_SIZES", None)
+        if lot:
+            assert "NIFTY" in lot
+            assert lot["NIFTY"] >= 1
+
+    def test_strike_preference(self):
+        pref = getattr(Config, "STRIKE_PREFERENCE", "best_return")
+        assert pref in ("best_return", "atm", "itm", "otm")
+
+    def test_load_key_file_missing(self):
+        # Should not crash when key.txt has wrong path
+        result = load_key_file("nonexistent_key_12345.txt")
+        assert isinstance(result, dict)
+        assert result == {} or "api_key" in result

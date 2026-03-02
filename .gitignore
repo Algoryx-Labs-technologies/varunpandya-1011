@@ -13,6 +13,11 @@ dist/
 build/
 *.log
 
+# Local DB
+apps/backend/data/*.db
+apps/backend/data/*.db-shm
+apps/backend/data/*.db-wal
+
 # Environment variables
 .env
 .env.local
@@ -35,4 +40,27 @@ Thumbs.db
 .cache/
 .temp/
 .tmp/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.venv/
+venv/
+ENV/
+env/
+*.log
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Trading Bot specific
+apps/trading/key.txt
+apps/trading/data/*.json
+apps/trading/data/*.xlsx
+apps/trading/data/*.csv
+apps/trading/logs/*.log
 

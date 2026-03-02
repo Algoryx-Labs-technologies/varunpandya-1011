@@ -1,17 +1,19 @@
 {
-  "name": "monorepo",
+  "name": "trading-monorepo",
   "version": "1.0.0",
-  "description": "Monorepo with web and api services",
+  "description": "Trading bot monorepo with custom backend and frontend",
   "private": true,
   "workspaces": [
-    "apps/web",
-    "apps/api"
+    "apps/backend",
+    "apps/frontend"
   ],
   "scripts": {
     "dev": "npm run dev --workspaces",
+    "dev:backend": "npm run dev --workspace=@trading/backend",
+    "dev:frontend": "npm run dev --workspace=@trading/frontend",
     "build": "npm run build --workspaces",
-    "test": "npm run test --workspaces",
-    "clean": "npm run clean --workspaces"
+    "start:backend": "npm start --workspace=@trading/backend",
+    "start:frontend": "npm run preview --workspace=@trading/frontend"
   },
   "devDependencies": {},
   "engines": {
