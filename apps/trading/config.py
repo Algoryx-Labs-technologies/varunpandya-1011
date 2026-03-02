@@ -67,7 +67,9 @@ class Config:
     FINNIFTY_ALLOCATION = _float_env('FINNIFTY_ALLOCATION', 0.0)
 
     # Risk Management
-    MAX_TRADES_PER_DAY = _int_env('MAX_TRADES_PER_DAY', 2)
+    MAX_TRADES_PER_DAY = _int_env('MAX_TRADES_PER_DAY', 4)
+    TRADE_CYCLES = max(1, _int_env('TRADE_CYCLES', 2))  # Number of trade cycles per day (e.g. 2)
+    TRADES_PER_CYCLE = max(1, _int_env('TRADES_PER_CYCLE', 2))  # Trades per cycle; alert when each cycle ends
     KILL_SWITCH_TIME = os.getenv('KILL_SWITCH_TIME', '15:15')
     STOP_LOSS_PERCENTAGE = _float_env('STOP_LOSS_PERCENTAGE', 2.0)
     TARGET_PERCENTAGE = _float_env('TARGET_PERCENTAGE', 1.5)
@@ -80,7 +82,7 @@ class Config:
     CANDLES_TO_WAIT = _int_env('CANDLES_TO_WAIT', 7)
     # Min candles to hold before allowing take-profit or time-based square off (stop loss still immediate)
     MIN_CANDLES_BEFORE_EXIT = _int_env('MIN_CANDLES_BEFORE_EXIT', 7)
-    # Number of candles after which to square off (time-based exit); typically 7–10
+    # Target candles (e.g. 7 or 10): square off trade after this many candles
     CANDLES_BEFORE_SQUARE_OFF = _int_env('CANDLES_BEFORE_SQUARE_OFF', 10)
     MIN_CANDLE_BODY_SIZE = _float_env('MIN_CANDLE_BODY_SIZE', 0.3)
     MIN_WICK_RATIO = _float_env('MIN_WICK_RATIO', 0.5)

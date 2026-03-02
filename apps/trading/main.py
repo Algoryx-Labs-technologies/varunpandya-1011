@@ -252,12 +252,18 @@ class TradingBot:
                 signal.status = 'executed'
                 signal.order_id = order_response.get('data', {}).get('orderid')
                 self.active_trades[signal.index] = signal
-                self.risk_manager.record_trade()
+                cycle_ended, cycle_number = self.risk_manager.record_trade()
                 self.position_sizer.update_capital(index, capital_used)
                 
                 logger.info(f"Order placed: {signal.direction} {index} @ {selected_strike} | Qty: {quantity}")
                 # Send to backend
                 self.backend_api.send_trade_signal(signal.to_dict())
+                if cycle_ended and cycle_number > 0:
+                    self.backend_api.send_trading_log(
+                        "info",
+                        f"Trade cycle {cycle_number} completed – all trades for this cycle are done",
+                        {"cycle_number": cycle_number}
+                    )
             else:
                 logger.error(f"Failed to place order: {order_response}")
         

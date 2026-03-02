@@ -8,8 +8,8 @@ A comprehensive Python-based trading bot for options trading using Angel One Sma
 - **Multi-Timeframe Analysis**: Supports 1m, 5m, and 15m timeframes
 - **Support/Resistance Levels**: Both manual and AI-assisted level detection
 - **Candlestick Pattern Detection**: Uses TA-Lib for pattern recognition
-- **Risk Management**: Auto-lock, kill switch, position monitoring, optional cycle net PnL target (stop new trades when daily PnL % reached)
-- **Exit logic**: Min 7 candles hold, then take profit or square off after 7–10 candles; stop loss always immediate
+- **Risk Management**: Trade cycles (default 2 per day, 2 trades per cycle); alert when each cycle completes; auto-lock after max trades, kill switch, optional cycle net PnL target
+- **Exit logic**: Min 7 candles hold, then take profit or square off after target candles (e.g. 7 or 10); stop loss always immediate
 - **Trade Journal**: Local JSON/Excel/CSV; trades and logs also sent to backend (DB + Logs tab)
 - **Backend Integration**: REST API (signals, trades, OHLC, option chain, alerts, trading logs); see repo root `TRADING_ENGINE_EXPLAINED.md` for full run process
 

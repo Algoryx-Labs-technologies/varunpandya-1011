@@ -413,15 +413,17 @@ class LevelManager:
         return typed_levels
     
     def get_levels(self, timeframe: str) -> List[Level]:
-        """Get all levels (manual + auto) for a timeframe"""
+        """
+        Get all levels (manual + automatic) for a timeframe.
+        Used every trade cycle: (1) Manual – user-defined from CSV/Excel/UI.
+        (2) Automatic – from ML and indicators (pivot, K-Means, ATR, Bollinger, SAR, ML detector).
+        Both sets are combined for signal generation.
+        """
         levels = []
-        
         if timeframe in self.manual_levels:
             levels.extend(self.manual_levels[timeframe])
-        
         if timeframe in self.auto_levels:
             levels.extend(self.auto_levels[timeframe])
-        
         return sorted(levels, key=lambda x: x.price)
     
     def get_levels_by_type(self, timeframe: str, level_type: str) -> List[Level]:

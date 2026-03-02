@@ -133,24 +133,29 @@ The strategy keeps a trade open for **at least 7 candles** (configurable) before
    - **Call:** if `current_price >= signal.target_price` → exit with reason `target`.  
    - **Put:** if `current_price <= signal.target_price` → exit with reason `target`.
 
-4. **Time-based square off (after N candles)**  
-   - If **candles_since_entry >= CANDLES_BEFORE_SQUARE_OFF** (default **10**) → exit with reason `time_based` at `current_price`.  
-   - So the trade is squared off after 7–10 candles (configurable) if it has not already been closed by stop loss or target.
+4. **Time-based square off (target candles)**  
+   - Set **CANDLES_BEFORE_SQUARE_OFF** to a target (e.g. **7** or **10**). If **candles_since_entry >= CANDLES_BEFORE_SQUARE_OFF** → exit with reason `time_based` at `current_price` (square off).  
+   - So the trade is squared off after that many candles if not already closed by stop loss or target.
 
 ### 3.2 Config knobs
 
 | Config / Env | Default | Meaning |
 |--------------|---------|---------|
 | **MIN_CANDLES_BEFORE_EXIT** | 7 | Minimum candles to hold before **take profit** or **time-based** exit is allowed. Stop loss is still immediate. |
-| **CANDLES_BEFORE_SQUARE_OFF** | 10 | Number of candles after which to **square off** the trade (time-based exit). Should be ≥ MIN_CANDLES_BEFORE_EXIT; typical range 7–10. |
+| **CANDLES_BEFORE_SQUARE_OFF** | 10 | **Target candles** (e.g. 7 or 10): after this many candles the trade is **squared off**. Set to 7 or 10; should be ≥ MIN_CANDLES_BEFORE_EXIT. |
 
-So “keep a trade for 7 to 10 candles before square off” is implemented as: **min hold 7 candles**, then either take profit when target is hit or **square off after 10 candles** (or whatever you set).
+Set **CANDLES_BEFORE_SQUARE_OFF** to **7** or **10**; once that many candles have passed, the trade is closed at market unless already closed by stop loss or target.
 
 ---
 
 ## 4. Levels: types, manual input, and automatic calculation
 
-Levels are support/resistance prices used to generate trading signals. They can be **manual** (you provide them in a file) or **automatic** (computed from OHLC). The strategy checks whether price has broken a level **with a qualifying candlestick pattern**; if so, it produces a signal (call or put).
+Levels are support/resistance prices used to generate trading signals. **Every trade cycle uses all levels from both sources:**
+
+1. **Manual** – Levels you define (CSV/Excel or UI).  
+2. **Automatic (intelligence)** – Levels from ML and indicators (pivot, K-Means, ATR, Bollinger, SAR, ML detector).
+
+The strategy merges **manual + automatic** for each timeframe and checks whether price has broken any level **with a qualifying candlestick pattern**; if so, it produces a signal (call or put). So both your own levels and the system’s computed levels are active in every cycle.
 
 ### 4.1 The 10 level types (what each does)
 
@@ -283,7 +288,8 @@ So automatic levels get refined to **EU / ED / TFU / TFD** depending on where pr
 
 ### 5.1 RiskManager (`risk/risk_manager.py`)
 
-- **Max trades per day** – `MAX_TRADES_PER_DAY` (e.g. 2). When reached, **auto_locked** is set and **can_trade()** returns false until the next day (or manual unlock).
+- **Trade cycles** – The day is split into **TRADE_CYCLES** (default **2**) cycles. Each cycle allows up to **TRADES_PER_CYCLE** (default **2**) trades (e.g. 2 × 2 = 4 total per day). When a cycle completes (e.g. after trade 2, cycle 1 is done), an **alert** and **trading log** are sent so the user is notified ("Trade cycle 1 completed – all trades for this cycle are done").
+- **Max trades per day** – `MAX_TRADES_PER_DAY` (e.g. 4). When reached, **auto_locked** is set and **can_trade()** returns false until the next day (or manual unlock).
 - **Kill-switch time** – `KILL_SWITCH_TIME` (e.g. 15:15). After this time, **can_trade()** returns false. A background thread can call **execute_kill_switch()** to cancel open orders and square off positions.
 - **Cycle net PnL target (opt-in)** – If **ENABLE_NET_PNL_TARGET** is true and daily net PnL (as % of **TRADING_CAPITAL**) reaches **NET_PNL_TARGET_PERCENT** (e.g. 20%), **cycle_pnl_target_reached** is set. Then **can_trade()** returns false until **reset_daily()** (next calendar day).
 
@@ -375,14 +381,16 @@ Relevant **env / config** (see `apps/trading/config.py` and `.env.example`):
 |-----|---------|-------------|
 | **TRADING_CAPITAL** | 20000 | Capital used for allocation and PnL %. |
 | **NIFTY_ALLOCATION**, **BANKNIFTY_ALLOCATION**, **FINNIFTY_ALLOCATION** | 0.5, 0.5, 0 | Fraction of capital per index. |
-| **MAX_TRADES_PER_DAY** | 2 | Max trades per day; then auto-lock. |
+| **MAX_TRADES_PER_DAY** | 4 | Max trades per day; then auto-lock. |
+| **TRADE_CYCLES** | 2 | Number of trade cycles per day (e.g. 2). |
+| **TRADES_PER_CYCLE** | 2 | Trades per cycle; alert sent when each cycle completes. |
 | **KILL_SWITCH_TIME** | 15:15 | No new trades after this time (HH:MM). |
 | **STOP_LOSS_PERCENTAGE**, **TARGET_PERCENTAGE** | 2.0, 1.5 | Used for SL/target levels. |
 | **ENABLE_NET_PNL_TARGET** | false | If true, stop new trades when daily PnL % ≥ target. |
 | **NET_PNL_TARGET_PERCENT** | 20 | Target daily PnL % of capital when opt-in is on. |
 | **CANDLES_TO_WAIT** | 7 | Used in strategy (e.g. pattern wait). |
 | **MIN_CANDLES_BEFORE_EXIT** | 7 | Min candles before take-profit or time-based exit. |
-| **CANDLES_BEFORE_SQUARE_OFF** | 10 | Candles after which to square off (time-based). |
+| **CANDLES_BEFORE_SQUARE_OFF** | 10 | Target candles (e.g. 7 or 10): square off trade after this many candles. |
 | **LEVELS_FILE** | levels/levels.csv | Manual levels file (CSV or Excel). |
 | **BACKEND_API_URL** | http://localhost:3000 | Backend base URL for the bot. |
 | **TIMEFRAMES** | 1m, 5m, 15m | OHLC timeframes. |
@@ -396,7 +404,7 @@ Credentials: **key.txt** (in `apps/trading/`) or env vars for Angel One (API key
 
 1. Bot sees a **level break** with a qualifying **pattern** → **TradeSignal** created.
 2. Bot sends **pattern detection** to backend → backend stores and broadcasts → frontend shows in Alerts/Patterns.
-3. Bot **places order** with broker → on success, adds to **active_trades**, **record_trade()**, sends **signal** to backend → backend stores and broadcasts.
+3. Bot **places order** with broker → on success, adds to **active_trades**, **record_trade()** (if a trade cycle completes, alert + log sent), sends **signal** to backend → backend stores and broadcasts.
 4. Each loop, bot runs **check_exit_conditions** for that trade: **stop loss** (any time), **take profit** and **time-based** only after **min 7 candles**, **square off** after **10 candles** if still open.
 5. On exit: **closing order** with broker, **Trade** with PnL → **TradeJournal** (local) + backend (POST trade + POST log) → backend stores and broadcasts.
 6. **Cycle net PnL** updated; if target % reached and opt-in on, **cycle_pnl_target_reached** set.

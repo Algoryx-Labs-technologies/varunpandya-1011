@@ -8,7 +8,7 @@ import threading
 import time
 import re
 from datetime import datetime, time as dt_time
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Any
 from loguru import logger
 from broker.angel_one import AngelOneBroker
 from strategy.trading_strategy import TradeSignal
@@ -38,7 +38,9 @@ class RiskManager:
     def __init__(self, broker: AngelOneBroker):
         self.broker = broker
         self.trade_count = 0
-        self.max_trades = max(0, int(getattr(Config, "MAX_TRADES_PER_DAY", 2) or 2))
+        self.max_trades = max(0, int(getattr(Config, "MAX_TRADES_PER_DAY", 4) or 4))
+        self.trade_cycles = max(1, int(getattr(Config, "TRADE_CYCLES", 2) or 2))
+        self.trades_per_cycle = max(1, int(getattr(Config, "TRADES_PER_CYCLE", 2) or 2))
         self.auto_locked = False
         self.cycle_pnl_target_reached = False  # Set when net PnL % target is hit (if opted in)
         _h, _m = _parse_kill_switch_time(getattr(Config, "KILL_SWITCH_TIME", "15:15"))
@@ -76,17 +78,30 @@ class RiskManager:
 
         return True, ""
 
-    def record_trade(self):
-        """Record a trade execution; alert on auto-lock."""
+    def record_trade(self) -> Tuple[bool, int]:
+        """
+        Record a trade execution; alert on auto-lock.
+        Returns (cycle_ended, cycle_number): when a full cycle completes (e.g. cycle 1 or 2), cycle_ended=True.
+        """
+        cycle_ended = False
+        cycle_number = 0
         with self._lock:
             self.trade_count += 1
             count, max_t = self.trade_count, self.max_trades
-        logger.info(f"Trade count: {count}/{max_t}")
+            per_cycle = self.trades_per_cycle
+            if count > 0 and count % per_cycle == 0:
+                cycle_ended = True
+                cycle_number = count // per_cycle
+        logger.info(f"Trade count: {count}/{max_t} (cycle {cycle_number} ended={cycle_ended})")
         if count >= max_t:
             with self._lock:
                 self.auto_locked = True
             alert(ALERT_WARNING, "Auto-lock activated - max trades reached", {"trade_count": count, "max_trades": max_t})
             logger.warning("Auto-lock activated - max trades reached")
+        elif cycle_ended:
+            alert(ALERT_WARNING, f"Trade cycle {cycle_number} completed – all trades for this cycle are done", {"cycle_number": cycle_number, "trade_count": count})
+            logger.warning(f"Trade cycle {cycle_number} completed – alert user")
+        return (cycle_ended, cycle_number)
     
     def unlock_trading(self):
         """Manually unlock trading (override auto-lock)"""

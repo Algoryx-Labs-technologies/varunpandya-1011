@@ -31,11 +31,10 @@ Production-grade, institutional-level intraday options trading system for Nifty/
 
 ### 3. Level Engine (`levels/level_manager.py`)
 
-#### Manual Mode
-- CSV/Excel upload (required columns: `price`, `type`, `timeframe`; optional: stoploss, target, confidence)
-- GUI entry support (Trading tab: Add level, Load from file)
-- Level types: EU (Easy Up), TFD (Target From Down), ED (Easy Down), TFU (Target From Up), RU (Reversal Up), TFRU, RD (Reversal Down), TFRD, EURTZ (Easy Up Retest Zone), EDRTZ (Easy Down Retest Zone)
-- See `levels/README_LEVELS.md` and repo root `TRADING_ENGINE_EXPLAINED.md` (Section 4) for full level semantics and automatic level calculation
+#### Levels per trade cycle (manual + automatic)
+- **Manual**: User-defined levels from CSV/Excel or UI (required columns: `price`, `type`, `timeframe`). Level types: EU, TFD, ED, TFU, RU, TFRU, RD, TFRD, EURTZ, EDRTZ.
+- **Automatic (intelligence)**: From ML and indicators (pivot, K-Means, ATR, Bollinger, SAR, ML detector). See `TRADING_ENGINE_EXPLAINED.md` Section 4.
+- **Every trade cycle** uses **all levels** from both sources (manual + automatic); `get_levels(timeframe)` returns the merged list.
 
 #### AI Auto-Level Mode (`ai/ml_level_detector.py`)
 - **10+ Indicator Variations**:
@@ -97,7 +96,7 @@ Production-grade, institutional-level intraday options trading system for Nifty/
   - **Stop loss**: Always allowed immediately (user-defined SL %).
   - **Minimum hold**: No take-profit or time-based exit until `MIN_CANDLES_BEFORE_EXIT` candles (default 7).
   - **Take profit**: Allowed only after min candles; exit at target if hit.
-  - **Time-based square off**: After `CANDLES_BEFORE_SQUARE_OFF` candles (default 10), exit at market if still in trade.
+  - **Time-based square off**: After target candles (`CANDLES_BEFORE_SQUARE_OFF`, e.g. 7 or 10), exit at market if still in trade.
 
 ### 6. Strike Selection Engine (`money/position_sizing.py`)
 - **Manual Mode**: User provides daily strikes list
@@ -110,7 +109,8 @@ Production-grade, institutional-level intraday options trading system for Nifty/
   - Vectorized selection
 
 ### 7. Risk Engine (`risk/risk_manager.py`)
-- **Auto Lock**: After `MAX_TRADES_PER_DAY` (default 2); no new trades until next day (or manual unlock).
+- **Trade cycles**: `TRADE_CYCLES` (default 2) per day; `TRADES_PER_CYCLE` (default 2). When a cycle completes (e.g. after trade 2, cycle 1), an **alert** and **trading log** are sent ("Trade cycle N completed – all trades for this cycle are done").
+- **Auto Lock**: After `MAX_TRADES_PER_DAY` (default 4); no new trades until next day (or manual unlock).
 - **Kill Switch**: At `KILL_SWITCH_TIME` (e.g. 15:15 IST)
   - Cancel all open orders
   - Square off positions
