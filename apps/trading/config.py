@@ -6,8 +6,9 @@ from dotenv import load_dotenv
 from typing import Dict, Any
 from pathlib import Path
 
-# Load environment variables
-load_dotenv()
+# Load .env from app directory so it's found regardless of cwd
+_env_path = Path(__file__).resolve().parent / ".env"
+load_dotenv(dotenv_path=_env_path)
 
 def load_key_file(filepath: str = 'key.txt') -> Dict[str, str]:
     """Load credentials from key.txt file"""
@@ -76,7 +77,11 @@ class Config:
     ANGEL_ONE_CLIENT_ID = _angel_env("ANGEL_ONE_CLIENT_ID", "AUTH_USERNAME") or key_data.get('client_code') or os.getenv('ANGEL_ONE_CLIENT_ID', '')
     ANGEL_ONE_PASSWORD = _angel_env("ANGEL_ONE_PASSWORD", "AUTH_PASSWORD") or key_data.get('password') or os.getenv('ANGEL_ONE_PASSWORD', '')
     ANGEL_ONE_TOTP_SECRET = key_data.get('totp_secret') or os.getenv('ANGEL_ONE_TOTP_SECRET', '').strip() or os.getenv('ANGELONE_TOTP_SECRET', '').strip()
-    
+    # Angel One now uses mPIN (4-digit) for login; if set, use it instead of password for generateSession
+    ANGEL_ONE_MPIN = (os.getenv('ANGEL_ONE_MPIN') or '').strip()
+    # Key as 5-tuple for TOTP from 5th field: key_secret[4] = totp_secret
+    KEY_SECRET = (ANGEL_ONE_API_KEY, ANGEL_ONE_CLIENT_SECRET, ANGEL_ONE_CLIENT_ID, ANGEL_ONE_PASSWORD, ANGEL_ONE_TOTP_SECRET)
+
     # Trading Configuration (invalid env = use default)
     TRADING_CAPITAL = _float_env('TRADING_CAPITAL', 20000.0)
     NIFTY_ALLOCATION = _float_env('NIFTY_ALLOCATION', 0.5)

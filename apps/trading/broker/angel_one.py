@@ -1,10 +1,12 @@
 """
 Angel One SmartAPI Integration Module
-Handles authentication, order placement, and position management
+Handles authentication, order placement, and position management.
+Login matches key.txt format: api_key client_secret client_code password_or_mpin totp_secret
+Example: obj = SmartConnect(api_key=key_secret[0]); obj.generateSession(key_secret[2], key_secret[3], TOTP(key_secret[4]).now())
 """
 import time
 import pyotp
-from SmartApi import SmartConnect
+from SmartApi.smartConnect import SmartConnect
 from typing import Dict, List, Optional, Any
 from loguru import logger
 import json
@@ -25,35 +27,39 @@ class AngelOneBroker:
         self.jwt_token = None
         
     def connect(self) -> bool:
-        """Initialize and authenticate with Angel One API. Requires ANGEL_ONE_TOTP_SECRET in .env for 2FA."""
+        """Authenticate with Angel One. Uses KEY_SECRET (key.txt or .env): generateSession(key_secret[2], key_secret[3], TOTP(key_secret[4]).now())."""
         try:
-            if not (self.api_key and self.client_id and self.password):
-                logger.error("Missing broker credentials. Set ANGEL_ONE_API_KEY, ANGEL_ONE_CLIENT_ID, ANGEL_ONE_PASSWORD in .env")
+            key_secret = getattr(Config, "KEY_SECRET", None) or (self.api_key, "", self.client_id, self.password, self.totp_secret or "")
+            if not (key_secret[0] and key_secret[2]):
+                logger.error("Missing broker credentials. Use key.txt (5 space-separated values) or set ANGEL_ONE_* in .env")
                 return False
-            totp_secret = (self.totp_secret or "").strip()
+            totp_secret = (key_secret[4] or "").strip()
             if not totp_secret:
-                logger.error(
-                    "ANGEL_ONE_TOTP_SECRET is empty. Add your Angel One TOTP/2FA secret in .env to connect. "
-                    "Get it from Angel One app (Settings > API) or your 2FA setup."
-                )
+                logger.error("TOTP secret (key_secret[4]) is empty. Add to key.txt or ANGEL_ONE_TOTP_SECRET in .env")
                 return False
-            self.obj = SmartConnect(api_key=self.api_key)
-            totp = pyotp.TOTP(totp_secret)
-            totp_code = totp.now()
-            data = self.obj.generateSession(
-                self.client_id,
-                self.password,
-                totp_code
-            )
-            if data['status']:
-                self.jwt_token = data['data']['jwtToken']
-                self.feed_token = data['data']['feedToken']
-                mode = "PAPER" if getattr(Config, "PAPER_TRADING", True) else "LIVE"
-                logger.info(f"Connected to Angel One API (mode={mode}, no real orders in paper mode)")
-                return True
-            else:
-                logger.error(f"Failed to connect: {data['message']}")
+            # Second arg: mPIN if set, else key_secret[3] (password/mPIN from key.txt or .env)
+            login_pin = (getattr(Config, "ANGEL_ONE_MPIN", None) or "").strip() or (key_secret[3] or "").strip()
+            if not login_pin:
+                logger.error("Set password/mPIN: 4th value in key.txt or ANGEL_ONE_MPIN / ANGEL_ONE_PASSWORD in .env")
                 return False
+            self.obj = SmartConnect(api_key=key_secret[0])
+            for attempt in range(2):
+                totp_code = pyotp.TOTP(key_secret[4]).now()
+                data = self.obj.generateSession(key_secret[2], login_pin, totp_code)
+                if data.get('status'):
+                    self.jwt_token = data['data']['jwtToken']
+                    self.feed_token = data['data']['feedToken']
+                    mode = "PAPER" if getattr(Config, "PAPER_TRADING", True) else "LIVE"
+                    logger.info(f"Connected to Angel One API (mode={mode}, no real orders in paper mode)")
+                    return True
+                msg = (data.get('message') or "").lower()
+                if "invalid totp" in msg and attempt == 0:
+                    logger.warning("TOTP rejected, retrying with fresh code in 2s...")
+                    time.sleep(2)
+                    continue
+                logger.error(f"Failed to connect: {data.get('message', 'Unknown error')}")
+                return False
+            return False
         except Exception as e:
             logger.error(f"Error connecting to Angel One: {str(e)}")
             return False
