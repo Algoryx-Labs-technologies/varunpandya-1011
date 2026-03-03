@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { createChart, CandlestickSeries, LineSeries } from 'lightweight-charts'
+import { createChart } from 'lightweight-charts'
 
 function toChartTime(t: string | number): number {
   if (typeof t === 'number') return t
@@ -54,7 +54,7 @@ export default function PriceChart({ index, timeframe, candles, levels, currentP
       timeScale: { timeVisible: true, secondsVisible: false, borderColor: 'var(--v-border-subtle, rgba(255,255,255,0.06))' },
       rightPriceScale: { borderColor: 'var(--v-border-subtle, rgba(255,255,255,0.06))', scaleMargins: { top: 0.1, bottom: 0.2 } },
     })
-    const candleSeries = chart.addSeries(CandlestickSeries, {
+    const candleSeries = chart.addCandlestickSeries({
       upColor: 'var(--accent-green)',
       downColor: 'var(--accent-red)',
       borderDownColor: 'var(--accent-red)',
@@ -78,7 +78,7 @@ export default function PriceChart({ index, timeframe, candles, levels, currentP
         for (let j = 0; j < smaPeriod; j++) sum += data[i - j].close
         smaData.push({ time: data[i].time, value: sum / smaPeriod })
       }
-      const smaSeries = chart.addSeries(LineSeries, { color: 'var(--v-accent-gold)', lineWidth: 2 })
+      const smaSeries = chart.addLineSeries({ color: 'var(--v-accent-gold)', lineWidth: 2 })
       ;(smaSeries as { setData: (d: unknown[]) => void }).setData(smaData)
       smaSeriesRef.current = smaSeries
     }

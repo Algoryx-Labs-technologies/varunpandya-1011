@@ -2,7 +2,7 @@
  * Trading API Routes
  * Handles data from Python trading bot
  */
-import express from 'express';
+import express, { Request, Response } from 'express';
 import { tradingStore } from '../store/tradingStore.js';
 import * as persistence from '../db/persistence.js';
 import { getMarketStatus } from '../utils/marketHours.js';
@@ -10,68 +10,68 @@ import { getMarketStatus } from '../utils/marketHours.js';
 const router = express.Router();
 
 // Store trade signals
-router.post('/signals', (req, res) => {
+router.post('/signals', (req: Request, res: Response) => {
   try {
     const signal = req.body;
     tradingStore.addSignal(signal);
     tradingStore.broadcast('signal', signal);
     res.json({ status: 'success', message: 'Signal received' });
-  } catch (error) {
+  } catch (error: any) {
     res.status(500).json({ status: 'error', message: error.message });
   }
 });
 
 // Store trade executions (in-memory + DB)
-router.post('/trades', (req, res) => {
+router.post('/trades', (req: Request, res: Response) => {
   try {
     const trade = req.body;
     tradingStore.addTrade(trade);
     tradingStore.broadcast('trade', trade);
     persistence.saveTrade(trade).catch(() => {});
     res.json({ status: 'success', message: 'Trade recorded' });
-  } catch (error) {
+  } catch (error: any) {
     res.status(500).json({ status: 'error', message: error.message });
   }
 });
 
 // Store levels update
-router.post('/levels', (req, res) => {
+router.post('/levels', (req: Request, res: Response) => {
   try {
     const levels = req.body;
     tradingStore.updateLevels(levels);
     tradingStore.broadcast('levels', levels);
     res.json({ status: 'success', message: 'Levels updated' });
-  } catch (error) {
+  } catch (error: any) {
     res.status(500).json({ status: 'error', message: error.message });
   }
 });
 
 // Alerts from trading bot (auto-lock, kill switch, data failures)
-router.post('/alert', (req, res) => {
+router.post('/alert', (req: Request, res: Response) => {
   try {
     const { severity, message, payload } = req.body || {};
     tradingStore.addAlert({ severity: severity || 'info', message: message || '', payload: payload || {}, timestamp: new Date().toISOString() });
     tradingStore.broadcast('alert', { severity, message, payload });
     res.status(204).end();
-  } catch (error) {
+  } catch (error: any) {
     res.status(500).json({ status: 'error', message: error.message });
   }
 });
 
 // Store market data
-router.post('/market-data', (req, res) => {
+router.post('/market-data', (req: Request, res: Response) => {
   try {
     const marketData = req.body;
     tradingStore.updateMarketData(marketData);
     tradingStore.broadcast('market-data', marketData);
     res.json({ status: 'success', message: 'Market data updated' });
-  } catch (error) {
+  } catch (error: any) {
     res.status(500).json({ status: 'error', message: error.message });
   }
 });
 
 // --- OHLC candles (chart data); store + persist to DB ---
-router.post('/ohlc', (req, res) => {
+router.post('/ohlc', (req: Request, res: Response) => {
   try {
     const { index, timeframe, candles } = req.body || {};
     if (!index || !timeframe || !Array.isArray(candles)) {
@@ -81,15 +81,15 @@ router.post('/ohlc', (req, res) => {
     tradingStore.broadcast('ohlc', { index, timeframe, candles });
     persistence.saveCandles(index, timeframe, candles).catch(() => {});
     res.json({ status: 'success', message: 'OHLC updated' });
-  } catch (error) {
+  } catch (error: any) {
     res.status(500).json({ status: 'error', message: error.message });
   }
 });
 
-router.get('/ohlc', async (req, res) => {
-  const index = req.query.index || 'NIFTY';
-  const timeframe = req.query.timeframe || '5m';
-  const limit = Math.min(parseInt(req.query.limit, 10) || 500, 2000);
+router.get('/ohlc', async (req: Request, res: Response) => {
+  const index = (req.query.index as string) || 'NIFTY';
+  const timeframe = (req.query.timeframe as string) || '5m';
+  const limit = Math.min(parseInt(req.query.limit as string, 10) || 500, 2000);
   const fromStore = tradingStore.getOhlc(index, timeframe);
   if (fromStore.length > 0) {
     return res.json({ status: 'success', data: fromStore.slice(-limit) });
@@ -103,10 +103,10 @@ router.get('/ohlc', async (req, res) => {
 });
 
 // --- Option chain (real-time from broker/NSE); store + persist ---
-router.post('/option-chain', (req, res) => {
+router.post('/option-chain', (req: Request, res: Response) => {
   try {
     const payload = req.body || {};
-    const index = (payload.index || payload.index_name || 'NIFTY').toUpperCase();
+    const index = ((payload.index || payload.index_name || 'NIFTY') as string).toUpperCase();
     const normalized = {
       index,
       timestamp: payload.timestamp || new Date().toISOString(),
@@ -118,19 +118,19 @@ router.post('/option-chain', (req, res) => {
     tradingStore.broadcast('option-chain', normalized);
     persistence.saveOptionSnapshot(index, normalized).catch(() => {});
     res.json({ status: 'success', message: 'Option chain updated' });
-  } catch (error) {
+  } catch (error: any) {
     res.status(500).json({ status: 'error', message: error.message });
   }
 });
 
-router.get('/option-chain', (req, res) => {
-  const index = (req.query.index || 'NIFTY').toUpperCase();
+router.get('/option-chain', (req: Request, res: Response) => {
+  const index = ((req.query.index as string) || 'NIFTY').toUpperCase();
   const data = tradingStore.getOptionChain(index);
   res.json({ status: 'success', data: data || null });
 });
 
 // Get all signals
-router.get('/signals', (req, res) => {
+router.get('/signals', (req: Request, res: Response) => {
   res.json({
     status: 'success',
     data: tradingStore.getSignals()
@@ -138,7 +138,7 @@ router.get('/signals', (req, res) => {
 });
 
 // Get all trades
-router.get('/trades', (req, res) => {
+router.get('/trades', (req: Request, res: Response) => {
   res.json({
     status: 'success',
     data: tradingStore.getTrades()
@@ -146,7 +146,7 @@ router.get('/trades', (req, res) => {
 });
 
 // Get current levels
-router.get('/levels', (req, res) => {
+router.get('/levels', (req: Request, res: Response) => {
   res.json({
     status: 'success',
     data: tradingStore.getLevels()
@@ -169,14 +169,14 @@ BANKNIFTY,5m,ED,51200,51250,51100,Easy Down example
 BANKNIFTY,15m,EU,51300,51250,51400,Easy Up 15m
 `;
 
-router.get('/levels/sample', (req, res) => {
+router.get('/levels/sample', (req: Request, res: Response) => {
   res.setHeader('Content-Type', 'text/csv');
   res.setHeader('Content-Disposition', 'attachment; filename="levels_sample.csv"');
   res.send(SAMPLE_LEVELS_CSV);
 });
 
 // Get market data
-router.get('/market-data', (req, res) => {
+router.get('/market-data', (req: Request, res: Response) => {
   res.json({
     status: 'success',
     data: tradingStore.getMarketData()
@@ -184,7 +184,7 @@ router.get('/market-data', (req, res) => {
 });
 
 // Get statistics
-router.get('/statistics', (req, res) => {
+router.get('/statistics', (req: Request, res: Response) => {
   res.json({
     status: 'success',
     data: tradingStore.getStatistics()
@@ -192,22 +192,22 @@ router.get('/statistics', (req, res) => {
 });
 
 // Get config
-router.get('/config', (req, res) => {
+router.get('/config', (req: Request, res: Response) => {
   res.json({
     status: 'success',
     data: {
-      backend_url: process.env.BACKEND_URL || 'http://localhost:3000',
-      websocket_url: process.env.WEBSOCKET_URL || 'ws://localhost:3000'
+      backend_url: process.env.BACKEND_URL || 'http://localhost:4000',
+      websocket_url: process.env.WEBSOCKET_URL || 'ws://localhost:4000'
     }
   });
 });
 
 // --- Market status (Indian trading timings, IST from system time) ---
-router.get('/market-status', (req, res) => {
+router.get('/market-status', (req: Request, res: Response) => {
   try {
     const status = getMarketStatus();
     res.json({ status: 'success', data: status });
-  } catch (error) {
+  } catch (error: any) {
     res.status(500).json({ status: 'error', message: error.message });
   }
 });
@@ -228,23 +228,23 @@ const INDICATOR_CATALOG = [
   { id: 'volume_profile', name: 'Volume Profile', group: 'levels', min_bars: 2, description: 'High-volume price clusters (POC-style).' },
 ];
 
-router.get('/indicators/catalog', (req, res) => {
+router.get('/indicators/catalog', (req: Request, res: Response) => {
   res.json({ status: 'success', data: INDICATOR_CATALOG });
 });
 
 // --- Analytics (Python bot POSTs; frontend GETs) ---
-router.post('/analytics', (req, res) => {
+router.post('/analytics', (req: Request, res: Response) => {
   try {
     const payload = req.body;
     tradingStore.setAnalytics(payload);
     tradingStore.broadcast('analytics', payload);
     res.json({ status: 'success', message: 'Analytics updated' });
-  } catch (error) {
+  } catch (error: any) {
     res.status(500).json({ status: 'error', message: error.message });
   }
 });
 
-router.get('/analytics', (req, res) => {
+router.get('/analytics', (req: Request, res: Response) => {
   res.json({
     status: 'success',
     data: tradingStore.getAnalytics()
@@ -252,18 +252,18 @@ router.get('/analytics', (req, res) => {
 });
 
 // --- AI: missed trades (Python bot POSTs; frontend GETs) ---
-router.post('/ai/missed-trades', (req, res) => {
+router.post('/ai/missed-trades', (req: Request, res: Response) => {
   try {
     const payload = Array.isArray(req.body) ? req.body : (req.body?.missed_trades || []);
     tradingStore.setMissedTrades(payload);
     tradingStore.broadcast('missed-trades', payload);
     res.json({ status: 'success', message: 'Missed trades updated' });
-  } catch (error) {
+  } catch (error: any) {
     res.status(500).json({ status: 'error', message: error.message });
   }
 });
 
-router.get('/ai/missed-trades', (req, res) => {
+router.get('/ai/missed-trades', (req: Request, res: Response) => {
   res.json({
     status: 'success',
     data: tradingStore.getMissedTrades()
@@ -271,7 +271,7 @@ router.get('/ai/missed-trades', (req, res) => {
 });
 
 // --- Pattern detections (candlestick: pattern detected → signal → trade) ---
-router.post('/pattern-detection', (req, res) => {
+router.post('/pattern-detection', (req: Request, res: Response) => {
   try {
     const payload = req.body || {};
     const pattern = payload.pattern || 'PATTERN';
@@ -290,12 +290,12 @@ router.post('/pattern-detection', (req, res) => {
     tradingStore.broadcast('pattern-detection', payload);
     tradingStore.broadcast('alert', alertEntry);
     res.json({ status: 'success', message: 'Pattern detection recorded' });
-  } catch (error) {
+  } catch (error: any) {
     res.status(500).json({ status: 'error', message: error.message });
   }
 });
 
-router.get('/pattern-detections', (req, res) => {
+router.get('/pattern-detections', (req: Request, res: Response) => {
   res.json({
     status: 'success',
     data: tradingStore.getPatternDetections()
@@ -303,18 +303,18 @@ router.get('/pattern-detections', (req, res) => {
 });
 
 // --- Market Intelligence (PCR, OI, vol, trend, filter_score from bot) ---
-router.post('/market-intelligence', (req, res) => {
+router.post('/market-intelligence', (req: Request, res: Response) => {
   try {
     const payload = req.body || {};
     tradingStore.setMarketIntelligence(payload);
     tradingStore.broadcast('market-intelligence', payload);
     res.json({ status: 'success', message: 'Market intelligence updated' });
-  } catch (error) {
+  } catch (error: any) {
     res.status(500).json({ status: 'error', message: error.message });
   }
 });
 
-router.get('/market-intelligence', (req, res) => {
+router.get('/market-intelligence', (req: Request, res: Response) => {
   res.json({
     status: 'success',
     data: tradingStore.getMarketIntelligence()
@@ -322,18 +322,18 @@ router.get('/market-intelligence', (req, res) => {
 });
 
 // --- Risk status (trade count, max trades, auto-lock, kill switch) ---
-router.post('/risk-status', (req, res) => {
+router.post('/risk-status', (req: Request, res: Response) => {
   try {
     const payload = req.body || {};
     tradingStore.setRiskStatus(payload);
     tradingStore.broadcast('risk-status', payload);
     res.json({ status: 'success', message: 'Risk status updated' });
-  } catch (error) {
+  } catch (error: any) {
     res.status(500).json({ status: 'error', message: error.message });
   }
 });
 
-router.get('/risk-status', (req, res) => {
+router.get('/risk-status', (req: Request, res: Response) => {
   res.json({
     status: 'success',
     data: tradingStore.getRiskStatus()
@@ -341,26 +341,26 @@ router.get('/risk-status', (req, res) => {
 });
 
 // --- Manual unlock (user requests unlock; bot polls and clears)
-router.get('/unlock-request', (req, res) => {
+router.get('/unlock-request', (req: Request, res: Response) => {
   res.json({
     status: 'success',
     data: { unlock_requested: tradingStore.getUnlockRequested() }
   });
 });
 
-router.post('/request-unlock', (req, res) => {
+router.post('/request-unlock', (req: Request, res: Response) => {
   tradingStore.setUnlockRequested(true);
   tradingStore.broadcast('risk-status', { ...tradingStore.getRiskStatus(), unlock_requested: true });
   res.json({ status: 'success', message: 'Unlock requested; bot will clear auto-lock on next loop.' });
 });
 
-router.post('/clear-unlock-request', (req, res) => {
+router.post('/clear-unlock-request', (req: Request, res: Response) => {
   tradingStore.setUnlockRequested(false);
   res.json({ status: 'success', message: 'Unlock request cleared' });
 });
 
 // --- Alerts (get all: pattern + system) ---
-router.get('/alerts', (req, res) => {
+router.get('/alerts', (req: Request, res: Response) => {
   res.json({
     status: 'success',
     data: tradingStore.getAlerts()
@@ -368,26 +368,27 @@ router.get('/alerts', (req, res) => {
 });
 
 // --- Trading logs (store and retrieve by day) ---
-router.post('/logs', async (req, res) => {
+router.post('/logs', async (req: Request, res: Response) => {
   try {
     const { level, message, payload } = req.body || {};
     const entry = { level: level || 'info', message: message || '', payload: payload || {} };
     await persistence.saveTradingLog(entry);
     res.status(204).end();
-  } catch (error) {
+  } catch (error: any) {
     res.status(500).json({ status: 'error', message: error.message });
   }
 });
 
-router.get('/logs', async (req, res) => {
-  const dateStr = req.query.date || new Date().toISOString().slice(0, 10);
-  const limit = Math.min(parseInt(req.query.limit, 10) || 500, 2000);
+router.get('/logs', async (req: Request, res: Response) => {
+  const dateStr = (req.query.date as string) || new Date().toISOString().slice(0, 10);
+  const limit = Math.min(parseInt(req.query.limit as string, 10) || 500, 2000);
   try {
     const logs = await persistence.loadTradingLogsByDate(dateStr, limit);
     res.json({ status: 'success', data: logs });
-  } catch (error) {
+  } catch (error: any) {
     res.status(500).json({ status: 'error', message: error.message });
   }
 });
 
 export default router;
+

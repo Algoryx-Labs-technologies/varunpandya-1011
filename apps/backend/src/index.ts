@@ -2,11 +2,11 @@
  * Combined API + Backend Server
  * Merges apps/api (AngelOne auth, brokerage, orders, WebSocket proxy) with
  * apps/backend (trading bot integration, Vertex API, status page).
- * Run with: node src/index.js (trading + /ws only) or tsx src/index.js (full API routes).
+ * Run with: tsx src/index.ts
  */
-import express from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
-import { createServer } from 'http';
+import { createServer, Server } from 'http';
 import dotenv from 'dotenv';
 import tradingRoutes from './routes/trading.js';
 import { setupWebSocket } from './websocket/index.js';
@@ -15,9 +15,7 @@ dotenv.config();
 
 const app = express();
 const httpServer = createServer(app);
-const PORT_MIN = parseInt(process.env.PORT, 10) || 3005;
-const PORT_MAX = PORT_MIN + 50;
-let currentPort = PORT_MIN;
+const PORT = parseInt(process.env.PORT || '4000', 10);
 
 // Middleware
 app.use(cors());
@@ -25,17 +23,17 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Optional: request logger and API routes (load when running with tsx or compiled .js)
-let requestLogger = null;
-let validateConfig = null;
-let authRoutes = null;
-let brokerageRoutes = null;
-let portfolioRoutes = null;
-let marginRoutes = null;
-let marketDataRoutes = null;
-let orderRoutes = null;
-let setupWebSocketServer = null;
+let requestLogger: ((req: Request, res: Response, next: NextFunction) => void) | null = null;
+let validateConfig: (() => void) | null = null;
+let authRoutes: express.Router | null = null;
+let brokerageRoutes: express.Router | null = null;
+let portfolioRoutes: express.Router | null = null;
+let marginRoutes: express.Router | null = null;
+let marketDataRoutes: express.Router | null = null;
+let orderRoutes: express.Router | null = null;
+let setupWebSocketServer: ((server: Server) => void) | null = null;
 
-async function loadApiModules() {
+async function loadApiModules(): Promise<boolean> {
   try {
     const [
       loggerMod,
@@ -68,14 +66,14 @@ async function loadApiModules() {
     orderRoutes = orderMod?.default ?? null;
     setupWebSocketServer = wsRoutesMod?.setupWebSocketServer ?? null;
     return true;
-  } catch (e) {
+  } catch (e: any) {
     console.warn('API route modules not loaded (run with tsx or compile TS to JS for full API):', e.message);
     return false;
   }
 }
 
 // Status page (premium API landing)
-app.get('/', (req, res) => {
+app.get('/', (req: Request, res: Response) => {
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -163,7 +161,7 @@ app.get('/', (req, res) => {
 });
 
 // Health check (combined)
-app.get('/health', (req, res) => {
+app.get('/health', (req: Request, res: Response) => {
   res.json({
     status: 'ok',
     service: 'Vertex API',
@@ -172,44 +170,12 @@ app.get('/health', (req, res) => {
   });
 });
 
-function tryListen(port) {
-  if (port > PORT_MAX) {
-    console.error(`No free port in range ${PORT_MIN}-${PORT_MAX}. Set PORT env.`);
-    process.exit(1);
-  }
-  currentPort = port;
-  httpServer.listen(port, () => {
-    console.log(`🚀 Trading Backend API running on http://localhost:${port}`);
-    console.log(`📊 WebSocket: ws://localhost:${port}/ws`);
-    setupWebSocket(httpServer);
-    if (setupWebSocketServer) {
-      setupWebSocketServer(httpServer);
-      console.log(`🔌 Order WebSocket: ws://localhost:${port}/api/order/websocket`);
-    }
-    if (authRoutes) console.log(`🔐 Auth: http://localhost:${port}/api/auth`);
-    if (brokerageRoutes) console.log(`💰 Brokerage: http://localhost:${port}/api/brokerage`);
-    if (portfolioRoutes) console.log(`📊 Portfolio: http://localhost:${port}/api/portfolio`);
-    if (marginRoutes) console.log(`💵 Margin: http://localhost:${port}/api/margin`);
-    if (marketDataRoutes) console.log(`📈 Market data: http://localhost:${port}/api/market-data`);
-    if (orderRoutes) console.log(`📋 Order: http://localhost:${port}/api/order`);
-  });
-}
-
-httpServer.on('error', (err) => {
-  if (err.code === 'EADDRINUSE') {
-    httpServer.removeAllListeners('error');
-    httpServer.close(() => tryListen(currentPort + 1));
-  } else {
-    throw err;
-  }
-});
-
-async function start() {
+async function start(): Promise<void> {
   await loadApiModules();
   if (validateConfig) {
     try {
       validateConfig();
-    } catch (e) {
+    } catch (e: any) {
       console.warn('AngelOne config validation skipped:', e.message);
     }
   }
@@ -222,14 +188,14 @@ async function start() {
   if (marginRoutes) app.use('/api/margin', marginRoutes);
   if (marketDataRoutes) app.use('/api/market-data', marketDataRoutes);
   if (orderRoutes) app.use('/api/order', orderRoutes);
-  app.use((req, res) => {
+  app.use((req: Request, res: Response) => {
     res.status(404).json({
       status: false,
       message: 'Endpoint not found',
       errorcode: 'NOT_FOUND',
     });
   });
-  app.use((err, req, res, next) => {
+  app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
     console.error('Error:', err);
     res.status(500).json({
       status: false,
@@ -237,9 +203,28 @@ async function start() {
       errorcode: 'INTERNAL_ERROR',
     });
   });
-  tryListen(PORT_MIN);
+  
+  httpServer.listen(PORT, () => {
+    console.log(`🚀 Trading Backend API running on http://localhost:${PORT}`);
+    console.log(`📊 WebSocket: ws://localhost:${PORT}/ws`);
+    setupWebSocket(httpServer);
+    if (setupWebSocketServer) {
+      setupWebSocketServer(httpServer);
+      console.log(`🔌 Order WebSocket: ws://localhost:${PORT}/api/order/websocket`);
+    }
+    if (authRoutes) console.log(`🔐 Auth: http://localhost:${PORT}/api/auth`);
+    if (brokerageRoutes) console.log(`💰 Brokerage: http://localhost:${PORT}/api/brokerage`);
+    if (portfolioRoutes) console.log(`📊 Portfolio: http://localhost:${PORT}/api/portfolio`);
+    if (marginRoutes) console.log(`💵 Margin: http://localhost:${PORT}/api/margin`);
+    if (marketDataRoutes) console.log(`📈 Market data: http://localhost:${PORT}/api/market-data`);
+    if (orderRoutes) console.log(`📋 Order: http://localhost:${PORT}/api/order`);
+  });
 }
 
-start();
+start().catch((err) => {
+  console.error('Failed to start server:', err);
+  process.exit(1);
+});
 
 export default app;
+

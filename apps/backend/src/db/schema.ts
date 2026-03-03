@@ -4,26 +4,28 @@
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { mkdirSync, existsSync } from 'fs';
+import type Database from 'better-sqlite3';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DB_DIR = join(__dirname, '..', '..', 'data');
 const DB_PATH = join(DB_DIR, 'trading.db');
 
-let db = null;
-let Database = null;
+let db: Database | null = null;
+let DatabaseClass: typeof import('better-sqlite3').default | null = null;
 
-async function loadNative() {
-  if (Database) return;
+async function loadNative(): Promise<void> {
+  if (DatabaseClass) return;
   const mod = await import('better-sqlite3');
-  Database = mod.default;
+  DatabaseClass = mod.default;
 }
 
-export async function getDb() {
+export async function getDb(): Promise<Database | null> {
   if (db) return db;
   try {
     await loadNative();
+    if (!DatabaseClass) return null;
     if (!existsSync(DB_DIR)) mkdirSync(DB_DIR, { recursive: true });
-    db = new Database(DB_PATH);
+    db = new DatabaseClass(DB_PATH);
     db.pragma('journal_mode = WAL');
     return db;
   } catch (e) {
@@ -31,7 +33,7 @@ export async function getDb() {
   }
 }
 
-export async function init() {
+export async function init(): Promise<Database | null> {
   const database = await getDb();
   if (!database) return null;
   database.exec(`
@@ -122,9 +124,10 @@ export async function init() {
   return database;
 }
 
-export function close() {
+export function close(): void {
   if (db) {
     db.close();
     db = null;
   }
 }
+

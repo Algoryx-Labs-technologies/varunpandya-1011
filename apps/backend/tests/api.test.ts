@@ -1,13 +1,13 @@
 /**
- * Backend API tests (Node.js). Run: node tests/api.test.js
+ * Backend API tests (Node.js). Run: tsx tests/api.test.ts
  * Uses dummy in-memory store; no DB required.
  */
-const assert = (cond, msg) => {
+const assert = (cond: boolean, msg?: string): void => {
   if (!cond) throw new Error(msg || 'Assertion failed');
 };
 
-async function run() {
-  const base = 'http://localhost:3000';
+async function run(): Promise<void> {
+  const base = 'http://localhost:4000';
   let ok = 0;
 
   try {
@@ -17,7 +17,7 @@ async function run() {
     assert(data.status === 'ok', 'status ok');
     ok++;
     console.log('GET /health OK');
-  } catch (e) {
+  } catch (e: any) {
     console.log('GET /health SKIP (server may be down):', e.message);
   }
 
@@ -29,7 +29,7 @@ async function run() {
     assert(typeof data.data === 'object', 'data object');
     ok++;
     console.log('GET /api/trading/statistics OK');
-  } catch (e) {
+  } catch (e: any) {
     console.log('GET /api/trading/statistics SKIP:', e.message);
   }
 
@@ -49,7 +49,7 @@ async function run() {
     assert(data.status === 'success', 'signals accepted');
     ok++;
     console.log('POST /api/trading/signals OK');
-  } catch (e) {
+  } catch (e: any) {
     console.log('POST /api/trading/signals SKIP:', e.message);
   }
 
@@ -60,3 +60,4 @@ run().catch((e) => {
   console.error(e);
   process.exit(1);
 });
+

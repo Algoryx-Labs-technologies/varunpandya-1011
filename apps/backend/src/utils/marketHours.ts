@@ -6,12 +6,20 @@
 
 const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
 
-function nowInIST() {
+export function nowInIST(): Date {
   const utc = Date.now();
   return new Date(utc + IST_OFFSET_MS);
 }
 
-function getMarketStatus() {
+export interface MarketStatus {
+  live: boolean;
+  message: string;
+  istTime: string;
+  nextOpen: string | null;
+  nextClose: string | null;
+}
+
+export function getMarketStatus(): MarketStatus {
   const ist = nowInIST();
   const day = ist.getUTCDay(); // 0 = Sunday, 1 = Mon, ..., 6 = Sat
   const hour = ist.getUTCHours();
@@ -26,11 +34,11 @@ function getMarketStatus() {
 
   const live = isWeekday && isWithinHours;
 
-  const formatTime = (h, m) => `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+  const formatTime = (h: number, m: number): string => `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
   const istTimeStr = `${ist.getUTCFullYear()}-${String(ist.getUTCMonth() + 1).padStart(2, '0')}-${String(ist.getUTCDate()).padStart(2, '0')} ${formatTime(ist.getUTCHours(), ist.getUTCMinutes())} IST`;
 
-  let nextOpen = null;
-  let nextClose = null;
+  let nextOpen: string | null = null;
+  let nextClose: string | null = null;
   if (isWeekday) {
     if (timeMinutes < marketOpenMinutes) {
       nextOpen = `Today ${formatTime(9, 15)} IST`;
@@ -56,4 +64,3 @@ function getMarketStatus() {
   };
 }
 
-export { getMarketStatus, nowInIST };

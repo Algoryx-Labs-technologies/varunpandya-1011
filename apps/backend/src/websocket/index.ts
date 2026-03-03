@@ -2,16 +2,17 @@
  * WebSocket Server Setup
  * Provides real-time updates to frontend
  */
-import { WebSocketServer } from 'ws';
+import { WebSocketServer, WebSocket } from 'ws';
+import { Server } from 'http';
 import { tradingStore } from '../store/tradingStore.js';
 
-export function setupWebSocket(server) {
+export function setupWebSocket(server: Server): void {
   const wss = new WebSocketServer({ 
     server,
     path: '/ws'
   });
 
-  wss.on('connection', (ws, req) => {
+  wss.on('connection', (ws: WebSocket, req) => {
     console.log('New WebSocket connection:', req.socket.remoteAddress);
     
     // Add client to store
@@ -30,7 +31,6 @@ export function setupWebSocket(server) {
         analytics: tradingStore.getAnalytics(),
         missedTrades: tradingStore.getMissedTrades(),
         patternDetections: tradingStore.getPatternDetections(),
-        alerts: tradingStore.getAlerts(),
         marketIntelligence: tradingStore.getMarketIntelligence(),
         riskStatus: tradingStore.getRiskStatus(),
         ohlc: tradingStore.ohlc || {},
@@ -39,9 +39,9 @@ export function setupWebSocket(server) {
     }));
 
     // Handle incoming messages
-    ws.on('message', (message) => {
+    ws.on('message', (message: Buffer) => {
       try {
-        const data = JSON.parse(message);
+        const data = JSON.parse(message.toString());
         console.log('Received WebSocket message:', data.type);
         
         // Handle different message types
@@ -51,7 +51,7 @@ export function setupWebSocket(server) {
             break;
           case 'subscribe':
             // Client can subscribe to specific data types
-            ws.subscriptions = data.subscriptions || [];
+            (ws as any).subscriptions = data.subscriptions || [];
             break;
           default:
             console.log('Unknown message type:', data.type);
@@ -65,10 +65,11 @@ export function setupWebSocket(server) {
       console.log('WebSocket connection closed');
     });
 
-    ws.on('error', (error) => {
+    ws.on('error', (error: Error) => {
       console.error('WebSocket error:', error);
     });
   });
 
   console.log('WebSocket server initialized');
 }
+
