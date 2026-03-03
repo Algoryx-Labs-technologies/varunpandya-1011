@@ -20,6 +20,10 @@ function initApp() {
     if (window.location.pathname !== '/profile') {
       window.history.replaceState({}, '', '/profile')
     }
+  } else if (path.toLowerCase() === '/vertex') {
+    if (window.location.pathname !== '/vertex') {
+      window.history.replaceState({}, '', '/vertex')
+    }
   } else if (path === '/') {
     // Default to auth page - middleware will handle redirect if authenticated
     if (window.location.pathname !== '/') {

@@ -1,0 +1,167 @@
+/* Vertex panel styles – scoped for .vertex-page */
+.vertex-page .discover-panel { max-width: 720px; margin: 0 auto; padding-bottom: 2rem; }
+.vertex-page .discover-hero { text-align: center; margin-bottom: 2.5rem; }
+.vertex-page .discover-title { font-size: 1.5rem; font-weight: 700; color: var(--text-primary); margin-bottom: 0.75rem; }
+.vertex-page .discover-tagline { font-size: 1rem; line-height: 1.6; color: var(--text-secondary); }
+.vertex-page .discover-section-title { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted); margin-bottom: 1.25rem; }
+.vertex-page .discover-flow { margin-bottom: 2.5rem; }
+.vertex-page .discover-step { display: flex; align-items: flex-start; gap: 1.25rem; padding: 1rem 1.25rem; background: var(--bg-card); border: 1px solid var(--v-border-subtle); border-radius: var(--radius-md); margin-bottom: 0.75rem; }
+.vertex-page .discover-step-num { width: 40px; height: 40px; min-width: 40px; border-radius: 50%; background: var(--v-accent-gold-dim); color: var(--v-accent-gold); font-weight: 700; font-size: 1.125rem; display: flex; align-items: center; justify-content: center; }
+.vertex-page .discover-step-content h4 { font-size: 1rem; font-weight: 600; color: var(--text-primary); margin-bottom: 0.35rem; }
+.vertex-page .discover-step-content p { font-size: 0.9375rem; line-height: 1.55; color: var(--text-secondary); }
+.vertex-page .discover-accordion { border: 1px solid var(--v-border-subtle); border-radius: var(--radius-md); margin-bottom: 0.75rem; overflow: hidden; background: var(--bg-card); }
+.vertex-page .discover-accordion.open { border-color: var(--v-accent-gold-dim); }
+.vertex-page .discover-accordion-head { width: 100%; padding: 1rem 1.25rem; display: flex; align-items: center; justify-content: space-between; background: transparent; border: none; cursor: pointer; font-size: 1rem; font-weight: 600; color: var(--text-primary); text-align: left; }
+.vertex-page .discover-accordion-icon { width: 24px; height: 24px; border-radius: 50%; background: var(--v-bg-elevated); color: var(--v-accent-gold); display: flex; align-items: center; justify-content: center; font-size: 1.125rem; }
+.vertex-page .discover-accordion-body { padding: 0 1.25rem 1.25rem; }
+.vertex-page .discover-safety-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem; }
+.vertex-page .discover-safety-card { padding: 1rem; background: var(--v-bg-elevated); border-radius: var(--radius-sm); border: 1px solid var(--v-border-subtle); }
+.vertex-page .discover-safety-card h4 { font-size: 0.9375rem; font-weight: 600; color: var(--text-primary); margin-bottom: 0.35rem; }
+.vertex-page .discover-safety-card p { font-size: 0.8125rem; line-height: 1.5; color: var(--text-secondary); }
+.vertex-page .discover-tabs-list, .vertex-page .discover-tips-list { list-style: none; padding: 0; margin: 0; }
+.vertex-page .discover-tabs-list li, .vertex-page .discover-tips-list li { padding: 0.5rem 0; font-size: 0.9375rem; color: var(--text-secondary); }
+.vertex-page .discover-cta { padding: 1.25rem 1.5rem; background: var(--v-accent-gold-dim); border: 1px solid rgba(229, 184, 74, 0.2); border-radius: var(--radius-md); text-align: center; }
+.vertex-page .discover-cta p { margin: 0; font-size: 0.9375rem; color: var(--text-secondary); }
+
+.vertex-page .vertex-dashboard h2,
+.vertex-page .vertex-dashboard .dashboard-pattern-alerts h3,
+.vertex-page .risk-panel h2,
+.vertex-page .signals-panel h2,
+.vertex-page .trades-panel h2,
+.vertex-page .pattern-alerts-panel h2,
+.vertex-page .alerts-panel h2,
+.vertex-page .statistics-panel h2,
+.vertex-page .indicators-panel h2,
+.vertex-page .analytics-panel h2,
+.vertex-page .ai-panel h2,
+.vertex-page .market-intel-panel h2,
+.vertex-page .trading-logs-panel h2 { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); margin-bottom: 0.5rem; }
+.vertex-page .panel-intro { font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 1rem; }
+.vertex-page .dashboard-pattern-alerts { background: var(--bg-card); border: 1px solid var(--v-border-subtle); border-radius: var(--radius-md); padding: 1rem; margin-bottom: 1rem; }
+.vertex-page .pattern-alerts-strip { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.vertex-page .pattern-strip-item { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0.75rem; background: var(--v-bg-elevated); border-radius: var(--radius-sm); font-size: 0.8125rem; border-left: 3px solid var(--v-border-default); }
+.vertex-page .pattern-strip-item.bullish { border-left-color: var(--accent-green); }
+.vertex-page .pattern-strip-item.bearish { border-left-color: var(--accent-red); }
+.vertex-page .stats-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+.vertex-page .stat-card { background: var(--bg-card); border: 1px solid var(--v-border-subtle); border-radius: var(--radius-md); padding: 1.25rem; }
+.vertex-page .stat-card h3 { font-size: 0.6875rem; font-weight: 600; text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.5rem; }
+.vertex-page .stat-value { font-family: var(--v-font-mono); font-size: 1.75rem; font-weight: 700; color: var(--text-primary); }
+.vertex-page .stat-value.positive { color: var(--accent-green); }
+.vertex-page .stat-value.negative { color: var(--accent-red); }
+.vertex-page .recent-activity { background: var(--bg-card); border: 1px solid var(--v-border-subtle); border-radius: var(--radius-md); padding: 1.25rem; }
+.vertex-page .recent-activity h3 { font-size: 0.6875rem; font-weight: 600; text-transform: uppercase; color: var(--text-muted); margin-bottom: 1rem; }
+.vertex-page .signals-list { display: flex; flex-direction: column; gap: 0.5rem; }
+.vertex-page .signal-item { display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 1rem; background: var(--v-bg-elevated); border-radius: var(--radius-sm); }
+.vertex-page .signal-direction.call { background: var(--v-accent-emerald-dim); color: var(--accent-green); padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.6875rem; font-weight: 600; }
+.vertex-page .signal-direction.put { background: var(--v-accent-red-dim); color: var(--accent-red); padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.6875rem; font-weight: 600; }
+
+.vertex-page .trading-view { max-width: 1200px; margin: 0 auto; display: flex; flex-direction: column; gap: 1.25rem; }
+.vertex-page .trading-controls { display: flex; gap: 0.75rem; align-items: center; }
+.vertex-page .trading-controls select { background: var(--bg-card); border: 1px solid var(--v-border-default); color: var(--text-primary); padding: 0.5rem 0.75rem; border-radius: var(--radius-sm); font-size: 0.875rem; min-width: 140px; cursor: pointer; }
+.vertex-page .price-chart-wrap { background: var(--bg-card); border: 1px solid var(--v-border-subtle); border-radius: var(--radius-md); overflow: hidden; margin-bottom: 1rem; }
+.vertex-page .price-chart-header { display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 1rem; font-size: 0.8125rem; color: var(--text-secondary); border-bottom: 1px solid var(--v-border-subtle); }
+.vertex-page .price-chart-placeholder { display: flex; align-items: center; justify-content: center; color: var(--text-muted); font-size: 0.875rem; padding: 2rem; }
+.vertex-page .levels-panel { background: var(--bg-card); border: 1px solid var(--v-border-subtle); border-radius: var(--radius-md); padding: 1.5rem; }
+.vertex-page .levels-panel h3, .vertex-page .levels-panel h4 { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.5rem; }
+.vertex-page .levels-form { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-bottom: 1rem; }
+.vertex-page .levels-form select, .vertex-page .level-input { background: var(--v-bg-elevated); border: 1px solid var(--v-border-default); color: var(--text-primary); padding: 0.5rem 0.75rem; border-radius: var(--radius-sm); font-size: 0.8rem; }
+.vertex-page .level-input { width: 100px; font-family: var(--v-font-mono); }
+.vertex-page .btn-add-level { background: var(--v-accent-gold); color: var(--bg-card); border: none; padding: 0.5rem 1rem; border-radius: var(--radius-sm); font-size: 0.8rem; font-weight: 600; cursor: pointer; }
+.vertex-page .levels-file-actions { display: flex; gap: 1rem; align-items: center; margin-bottom: 0.5rem; }
+.vertex-page .btn-load-file { font-size: 0.8rem; color: var(--v-accent-gold); cursor: pointer; text-decoration: underline; }
+.vertex-page .link-download-sample { font-size: 0.8rem; color: var(--accent-green); text-decoration: none; }
+.vertex-page .levels-error { font-size: 0.8rem; color: var(--accent-red); }
+.vertex-page .levels-list { display: flex; flex-direction: column; gap: 0.5rem; }
+.vertex-page .level-item { display: flex; justify-content: space-between; align-items: center; padding: 0.625rem 1rem; background: var(--v-bg-elevated); border-radius: var(--radius-sm); }
+.vertex-page .level-type { font-family: var(--v-font-mono); font-size: 0.75rem; font-weight: 500; color: var(--v-accent-gold); }
+.vertex-page .level-price { font-family: var(--v-font-mono); font-weight: 600; color: var(--text-primary); }
+.vertex-page .btn-remove-level { margin-left: auto; background: transparent; border: 1px solid var(--v-border-subtle); color: var(--text-muted); width: 1.5rem; height: 1.5rem; border-radius: var(--radius-sm); cursor: pointer; font-size: 1rem; line-height: 1; padding: 0; }
+
+.vertex-page .option-chain-panel { background: var(--bg-card); border: 1px solid var(--v-border-subtle); border-radius: var(--radius-md); padding: 1rem; margin-bottom: 1rem; }
+.vertex-page .option-chain-header { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-bottom: 0.75rem; }
+.vertex-page .option-chain-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.vertex-page .option-chain-table { width: 100%; border-collapse: collapse; font-size: 0.8125rem; }
+.vertex-page .option-chain-table th, .vertex-page .option-chain-table td { padding: 0.5rem; text-align: left; border-bottom: 1px solid var(--v-border-subtle); }
+
+.vertex-page .signals-panel, .vertex-page .trades-panel { max-width: 1400px; margin: 0 auto; background: var(--bg-card); border: 1px solid var(--v-border-subtle); border-radius: var(--radius-md); overflow: hidden; }
+.vertex-page .signals-panel h2, .vertex-page .trades-panel h2 { padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--v-border-subtle); }
+.vertex-page .signals-table table, .vertex-page .trades-table table { width: 100%; border-collapse: collapse; }
+.vertex-page .signals-table th, .vertex-page .trades-table th { background: var(--v-bg-elevated); font-size: 0.6875rem; font-weight: 600; text-transform: uppercase; padding: 0.75rem 1rem; color: var(--text-muted); }
+.vertex-page .signals-table td, .vertex-page .trades-table td { padding: 0.75rem 1rem; font-size: 0.8125rem; color: var(--text-secondary); border-bottom: 1px solid var(--v-border-subtle); }
+.vertex-page .signals-table .direction.call, .vertex-page .trades-table .direction.call { color: var(--accent-green); font-weight: 600; }
+.vertex-page .signals-table .direction.put, .vertex-page .trades-table .direction.put { color: var(--accent-red); font-weight: 600; }
+.vertex-page .pnl.positive { color: var(--accent-green); }
+.vertex-page .pnl.negative { color: var(--accent-red); }
+.vertex-page .mono { font-family: var(--v-font-mono); font-variant-numeric: tabular-nums; }
+
+.vertex-page .risk-panel { max-width: 720px; margin: 0 auto; }
+.vertex-page .risk-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 1rem; }
+.vertex-page .risk-card { background: var(--bg-card); border: 1px solid var(--v-border-subtle); border-radius: var(--radius-md); padding: 1.25rem; text-align: center; }
+.vertex-page .risk-card.ok { border-left: 4px solid var(--accent-green); }
+.vertex-page .risk-card.blocked { border-left: 4px solid var(--accent-red); }
+.vertex-page .risk-card-label { display: block; font-size: 0.6875rem; text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.5rem; }
+.vertex-page .risk-card-value { font-size: 1.125rem; font-weight: 600; color: var(--text-primary); }
+.vertex-page .unlock-btn { padding: 0.5rem 1rem; font-size: 0.875rem; font-weight: 600; color: var(--text-primary); background: var(--v-accent-gold); border: none; border-radius: var(--radius-md); cursor: pointer; }
+.vertex-page .unlock-btn:disabled { opacity: 0.7; cursor: not-allowed; }
+
+.vertex-page .alerts-panel { max-width: 720px; margin: 0 auto; }
+.vertex-page .alerts-feed { display: flex; flex-direction: column; gap: 0.5rem; }
+.vertex-page .alert-item { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; padding: 0.75rem 1rem; background: var(--v-bg-elevated); border-radius: var(--radius-sm); font-size: 0.875rem; }
+.vertex-page .alert-badge { font-size: 0.6875rem; text-transform: uppercase; padding: 0.2rem 0.4rem; border-radius: 4px; background: var(--v-border-subtle); }
+
+.vertex-page .statistics-panel .stats-container { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1.5rem; }
+.vertex-page .stat-group h3 { font-size: 0.6875rem; font-weight: 600; text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.75rem; }
+.vertex-page .stat-item { display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0; font-size: 0.875rem; }
+.vertex-page .stat-item label { color: var(--text-secondary); }
+.vertex-page .positive { color: var(--accent-green); }
+.vertex-page .negative { color: var(--accent-red); }
+
+.vertex-page .pattern-alerts-panel .pattern-flow { margin-bottom: 1.5rem; }
+.vertex-page .pattern-flow h3 { font-size: 0.8125rem; font-weight: 600; color: var(--text-muted); margin-bottom: 0.75rem; }
+.vertex-page .pattern-alert { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; padding: 0.75rem; background: var(--v-bg-elevated); border-radius: var(--radius-sm); margin-bottom: 0.5rem; }
+.vertex-page .pattern-badge { font-weight: 600; color: var(--text-primary); }
+.vertex-page .compact-table { width: 100%; border-collapse: collapse; font-size: 0.8125rem; }
+.vertex-page .compact-table th, .vertex-page .compact-table td { padding: 0.5rem 0.75rem; text-align: left; border-bottom: 1px solid var(--v-border-subtle); }
+
+.vertex-page .market-intel-panel { max-width: 900px; margin: 0 auto; }
+.vertex-page .mi-hero { display: flex; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.5rem; }
+.vertex-page .mi-score-card { padding: 1.25rem; border-radius: var(--radius-md); text-align: center; min-width: 120px; background: var(--bg-card); border: 1px solid var(--v-border-subtle); }
+.vertex-page .mi-score-card.bullish { border-left: 4px solid var(--accent-green); }
+.vertex-page .mi-score-card.bearish { border-left: 4px solid var(--accent-red); }
+.vertex-page .mi-metrics { display: flex; flex-wrap: wrap; gap: 1rem; }
+.vertex-page .mi-metric { padding: 0.75rem 1rem; background: var(--v-bg-elevated); border-radius: var(--radius-sm); font-size: 0.875rem; }
+.vertex-page .mi-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem; }
+.vertex-page .mi-card { background: var(--bg-card); border: 1px solid var(--v-border-subtle); border-radius: var(--radius-md); padding: 1rem; }
+.vertex-page .mi-row { display: flex; justify-content: space-between; padding: 0.35rem 0; font-size: 0.8125rem; }
+.vertex-page .pill { font-size: 0.75rem; padding: 0.2rem 0.5rem; border-radius: 4px; }
+.vertex-page .pill.bullish { background: rgba(34, 197, 94, 0.2); color: var(--accent-green); }
+.vertex-page .pill.bearish { background: var(--v-accent-red-dim); color: var(--accent-red); }
+
+.vertex-page .indicators-panel .indicator-group { margin-bottom: 1.5rem; }
+.vertex-page .indicator-card { padding: 1rem; background: var(--bg-card); border: 1px solid var(--v-border-subtle); border-radius: var(--radius-sm); margin-bottom: 0.5rem; list-style: none; }
+.vertex-page .indicator-name { font-weight: 600; color: var(--text-primary); }
+.vertex-page .indicator-desc { font-size: 0.8125rem; color: var(--text-secondary); margin-top: 0.25rem; }
+
+.vertex-page .analytics-panel .breakdown-block { margin-top: 1.5rem; }
+.vertex-page .breakdown-table { width: 100%; border-collapse: collapse; font-size: 0.8125rem; }
+.vertex-page .breakdown-table th, .vertex-page .breakdown-table td { padding: 0.5rem 0.75rem; text-align: left; border-bottom: 1px solid var(--v-border-subtle); }
+
+.vertex-page .ai-summary { display: flex; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap; }
+.vertex-page .ai-summary-card { padding: 1rem 1.25rem; background: var(--bg-card); border: 1px solid var(--v-border-subtle); border-radius: var(--radius-md); }
+.vertex-page .ai-summary-label { display: block; font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.25rem; }
+.vertex-page .missed-card { padding: 0.75rem; background: var(--v-bg-elevated); border-radius: var(--radius-sm); margin-bottom: 0.5rem; font-size: 0.875rem; }
+.vertex-page .reason-list { list-style: none; padding: 0; }
+.vertex-page .reason-list li { display: flex; justify-content: space-between; padding: 0.35rem 0; }
+
+.vertex-page .trading-logs-panel .logs-controls { margin-bottom: 1rem; }
+.vertex-page .logs-controls input[type="date"] { padding: 0.5rem; border: 1px solid var(--v-border-default); border-radius: var(--radius-sm); background: var(--bg-card); color: var(--text-primary); }
+.vertex-page .log-item { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; padding: 0.75rem; background: var(--v-bg-elevated); border-radius: var(--radius-sm); margin-bottom: 0.5rem; font-size: 0.8125rem; }
+.vertex-page .log-badge { font-size: 0.6875rem; text-transform: uppercase; padding: 0.2rem 0.4rem; border-radius: 4px; }
+.vertex-page .log-payload pre { font-size: 0.75rem; overflow-x: auto; margin-top: 0.5rem; }
+
+.vertex-page .empty-state, .vertex-page .loading { color: var(--text-muted); font-size: 0.875rem; padding: 1.5rem; text-align: center; }
+.vertex-page .levels-list-wrapper h4 { margin-top: 1rem; }
+.vertex-page .manual-levels-list h4 { margin-top: 1rem; margin-bottom: 0.5rem; }
+.vertex-page .level-opt { font-size: 0.7rem; color: var(--text-muted); margin-left: 0.5rem; }
+.vertex-page .level-confidence { font-size: 0.75rem; color: var(--text-muted); }
+.vertex-page .level-item-manual { display: flex; align-items: center; gap: 0.5rem; }

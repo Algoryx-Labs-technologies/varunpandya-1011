@@ -6,6 +6,7 @@ import Dashboard from './components/Dashboard'
 import Trading from './components/Trading'
 import Auth from './components/Auth'
 import Profile from './components/Profile'
+import Vertex from './components/Vertex/Vertex'
 
 export default function App() {
   const [route, setRoute] = useState<RouteKey>(() => protectRoute(getCurrentRoute()))
@@ -35,6 +36,7 @@ export default function App() {
         {route === 'dashboard' && <Dashboard />}
         {route === 'trading' && <Trading />}
         {route === 'profile' && <Profile />}
+        {route === 'vertex' && <Vertex />}
       </div>
     </>
   )

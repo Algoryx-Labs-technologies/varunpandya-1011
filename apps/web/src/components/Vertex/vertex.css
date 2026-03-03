@@ -1,0 +1,109 @@
+/* Vertex Options – scoped under .vertex-page, uses app vars where possible */
+.vertex-page {
+  --v-border-subtle: rgba(255, 255, 255, 0.06);
+  --v-border-default: rgba(255, 255, 255, 0.1);
+  --v-bg-elevated: var(--bg-card-elevated, #242636);
+  --v-bg-hover: rgba(255, 255, 255, 0.04);
+  --v-accent-gold: #e5b84a;
+  --v-accent-gold-dim: rgba(229, 184, 74, 0.18);
+  --v-accent-emerald: var(--accent-green);
+  --v-accent-emerald-dim: rgba(34, 197, 94, 0.15);
+  --v-accent-red-dim: rgba(239, 68, 68, 0.15);
+  --v-transition: 0.2s ease;
+  --v-font-mono: ui-monospace, 'JetBrains Mono', monospace;
+  --v-shadow-card: 0 4px 24px rgba(0, 0, 0, 0.25);
+}
+
+.vertex-page .vertex-header {
+  background: linear-gradient(180deg, var(--bg-card) 0%, var(--v-bg-elevated) 100%);
+  border-bottom: 1px solid var(--v-border-default);
+  padding: 0 1.75rem;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+
+.vertex-page .vertex-header h2 {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.vertex-page .vertex-header h2 span {
+  color: var(--v-accent-gold);
+}
+
+.vertex-page .vertex-status {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.vertex-page .vertex-status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  transition: var(--v-transition);
+}
+
+.vertex-page .vertex-status-dot.connected {
+  background: var(--accent-green);
+}
+
+.vertex-page .vertex-status-dot.disconnected {
+  background: var(--accent-red);
+}
+
+.vertex-page .vertex-status-dot.market-closed {
+  background: var(--v-accent-gold);
+}
+
+.vertex-page .vertex-nav {
+  background: var(--v-bg-elevated);
+  padding: 0 1rem;
+  display: flex;
+  gap: 0.125rem;
+  border-bottom: 1px solid var(--v-border-subtle);
+  min-height: 44px;
+  align-items: stretch;
+  overflow-x: auto;
+  flex-shrink: 0;
+}
+
+.vertex-page .vertex-nav button {
+  padding: 0 0.875rem;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  position: relative;
+  transition: color var(--v-transition), background var(--v-transition);
+  white-space: nowrap;
+  border-radius: var(--radius-sm);
+  margin: 6px 0;
+}
+
+.vertex-page .vertex-nav button:hover {
+  color: var(--text-primary);
+  background: var(--v-bg-hover);
+}
+
+.vertex-page .vertex-nav button.active {
+  color: var(--v-accent-gold);
+  background: var(--v-accent-gold-dim);
+}
+
+.vertex-page .vertex-main {
+  flex: 1;
+  padding: 1.5rem 1.75rem;
+  overflow-y: auto;
+  background: var(--bg-main);
+}

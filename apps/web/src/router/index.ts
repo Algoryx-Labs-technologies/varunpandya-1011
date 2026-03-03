@@ -7,6 +7,7 @@ export function getCurrentRoute(): RouteKey {
   if (path.toLowerCase() === '/trading') return 'trading'
   if (path.toLowerCase() === '/dashboard') return 'dashboard'
   if (path.toLowerCase() === '/profile') return 'profile'
+  if (path.toLowerCase() === '/vertex') return 'vertex'
   return 'auth'
 }
 

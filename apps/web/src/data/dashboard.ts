@@ -61,7 +61,7 @@ export function getRMSLimit(): Promise<RMSLimitResponse> {
     ...res,
     data: Object.fromEntries(
       Object.entries(res.data).map(([k, v]) => [k, typeof v === 'string' ? v : String(v)])
-    ) as RMSLimitResponse['data'],
+    ) as unknown as RMSLimitResponse['data'],
   }))
 }
 

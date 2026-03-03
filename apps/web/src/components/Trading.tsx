@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { getCurrentNiftyPrice } from '../data/optionChain'
 import { getPosition, getAllHolding } from '../data/dashboard'
 import { getLogsData } from '../data/logs'
@@ -7,7 +7,7 @@ import type { PositionItem, HoldingItem } from '../types/dashboard'
 
 export default function Trading() {
   const [terminalTime, setTerminalTime] = useState('')
-  const [niftyPrice] = useState(() => getCurrentNiftyPrice().toLocaleString('en-IN'))
+  const [_niftyPrice] = useState(() => getCurrentNiftyPrice().toLocaleString('en-IN'))
   const [holdings, setHoldings] = useState<HoldingItem[]>([])
   const [holdingsLoading, setHoldingsLoading] = useState(true)
   const [holdingsError, setHoldingsError] = useState(false)

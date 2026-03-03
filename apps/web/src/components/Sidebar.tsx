@@ -55,6 +55,20 @@ export default function Sidebar({ currentRoute, onNavigate }: SidebarProps) {
               Trading
             </a>
           </li>
+          <li className="nav-item">
+            <a
+              href={ROUTES.vertex}
+              className={`nav-link ${currentRoute === 'vertex' ? 'active' : ''}`}
+              onClick={(e) => handleNavClick(e, 'vertex')}
+              aria-current={currentRoute === 'vertex' ? 'page' : undefined}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                <path d="M2 17l10 5 10-5"/>
+              </svg>
+              Vertex
+            </a>
+          </li>
           <li className="nav-item nav-item-button">
             <button type="button" className="sidebar-add-trade btn-pill primary" onClick={handleAddTrade}>
               + Add Trade
