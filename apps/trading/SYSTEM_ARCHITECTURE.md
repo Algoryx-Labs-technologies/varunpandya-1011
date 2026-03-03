@@ -8,7 +8,7 @@ Production-grade, institutional-level intraday options trading system for Nifty/
 
 ### 1. Broker Wrapper (`broker/angel_one.py`)
 - **SmartAPI Integration**: Full wrapper around Angel One SmartAPI
-- **Key File Loading**: Loads credentials from `key.txt` (space-separated format)
+- **Credentials**: Loaded from `.env` only (ANGEL_ONE_*)
 - **Methods**:
   - `connect()` - Authenticate with TOTP
   - `place_buy_order()` / `place_sell_order()` - Order placement
@@ -206,8 +206,7 @@ Frontend (React)
 ## Key Files
 
 - `main.py` - Main orchestrator
-- `config.py` - Configuration (loads from key.txt)
-- `key.txt` - Credentials (api_key client_secret client_code password totp_secret)
+- `config.py` - Configuration (from .env only)
 
 ## Performance Requirements
 
@@ -230,7 +229,7 @@ Frontend (React)
 
 ## Installation & Setup
 
-1. **Trading bot**: `cd apps/trading`, `pip install -r requirements.txt`, configure `key.txt` (or `.env`) with Angel One credentials, set `BACKEND_API_URL` in `.env`, run `python main.py`.
+1. **Trading bot**: `cd apps/trading`, `pip install -r requirements.txt`, configure `.env` with Angel One credentials and `BACKEND_API_URL`, run `python main.py`.
 2. **Full stack**: From repo root run `node run-all.js` to start backend + frontend; see repo root **`TRADING_ENGINE_EXPLAINED.md`** Section 12 (Process to run the system) for full steps.
 
 ## Integration

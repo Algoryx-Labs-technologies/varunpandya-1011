@@ -22,4 +22,4 @@ pytest tests/test_risk.py -v
 pytest tests/test_data_dummy.py -v
 ```
 
-Tests use dummy data (conftest.py). No live API or real `key.txt` required. For full system description and run process, see repo root **`TRADING_ENGINE_EXPLAINED.md`**.
+Tests use dummy data (conftest.py). No live API or real credentials required. For full system description and run process, see repo root **`TRADING_ENGINE_EXPLAINED.md`**.

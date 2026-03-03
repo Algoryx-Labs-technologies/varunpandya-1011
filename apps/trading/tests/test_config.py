@@ -1,5 +1,5 @@
 """
-Tests for config and key.txt loading (no real secrets).
+Tests for config (.env only; no real secrets).
 Run from apps/trading: pytest tests/test_config.py -v
 """
 import pytest
@@ -8,12 +8,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from config import Config, load_key_file
+from config import Config
 
 
 class TestConfig:
     def test_get_allocation(self):
-        # Default allocations sum to 1.0 for NIFTY+BANKNIFTY
         n = Config.get_allocation("NIFTY")
         b = Config.get_allocation("BANKNIFTY")
         f = Config.get_allocation("FINNIFTY")
@@ -29,8 +28,7 @@ class TestConfig:
         pref = getattr(Config, "STRIKE_PREFERENCE", "best_return")
         assert pref in ("best_return", "atm", "itm", "otm")
 
-    def test_load_key_file_missing(self):
-        # Should not crash when key.txt has wrong path
-        result = load_key_file("nonexistent_key_12345.txt")
-        assert isinstance(result, dict)
-        assert result == {} or "api_key" in result
+    def test_key_secret_tuple(self):
+        key_secret = getattr(Config, "KEY_SECRET", None)
+        assert key_secret is not None
+        assert isinstance(key_secret, (tuple, list)) and len(key_secret) >= 5

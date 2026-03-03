@@ -181,7 +181,7 @@ Trades are automatically logged to:
 
 ## Notes
 
-- Credentials: use **key.txt** (one line: api_key client_secret client_code password totp_secret) or set env vars; see `.env.example`.
+- Credentials: set all Angel One vars in **.env**; see `.env.example`.
 - Ensure TA-Lib is properly installed for full indicator/auto-level support.
 - Backend integration is optional; without it the bot still runs but won't push data to the web UI. For full stack, run backend + frontend from repo root with `node run-all.js`, then start the bot with `BACKEND_API_URL` set to the backend port.
 

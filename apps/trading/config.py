@@ -3,47 +3,14 @@ Configuration management for the trading system
 """
 import os
 from dotenv import load_dotenv
-from typing import Dict, Any
 from pathlib import Path
 
 # Load .env from app directory so it's found regardless of cwd
 _env_path = Path(__file__).resolve().parent / ".env"
 load_dotenv(dotenv_path=_env_path)
 
-def load_key_file(filepath: str = 'key.txt') -> Dict[str, str]:
-    """Load credentials from key.txt file"""
-    try:
-        key_path = Path(__file__).parent / filepath
-        if key_path.exists():
-            with open(key_path, 'r') as f:
-                line = f.read().strip()
-                parts = line.split()
-                if len(parts) >= 5:
-                    return {
-                        'api_key': parts[0],
-                        'client_secret': parts[1],
-                        'client_code': parts[2],
-                        'password': parts[3],
-                        'totp_secret': parts[4]
-                    }
-        return {}
-    except Exception as e:
-        print(f"Error loading key.txt: {e}")
-        return {}
-
-# Load from key.txt first, then fallback to env (including ANGELONE_* alternative names)
-key_data = load_key_file()
-
-
-_ANGEL_KEY_MAP = {"ANGEL_ONE_API_KEY": "api_key", "ANGEL_ONE_CLIENT_SECRET": "client_secret", "ANGEL_ONE_CLIENT_ID": "client_code", "ANGEL_ONE_PASSWORD": "password", "ANGEL_ONE_TOTP_SECRET": "totp_secret"}
-
-
 def _angel_env(env_key: str, alt_key: str = None) -> str:
-    """Get Angel One credential: key.txt -> ANGEL_ONE_* -> alt env (e.g. ANGELONE_TRADING_API_KEY, AUTH_USERNAME)."""
-    if isinstance(key_data, dict):
-        k = _ANGEL_KEY_MAP.get(env_key)
-        if k and key_data.get(k):
-            return key_data.get(k)
+    """Get Angel One credential from .env only (ANGEL_ONE_* or alt e.g. ANGELONE_TRADING_API_KEY)."""
     val = (os.getenv(env_key) or "").strip()
     if val:
         return val
@@ -71,15 +38,14 @@ def _int_env(key: str, default: int) -> int:
 class Config:
     """Central configuration class"""
     
-    # Angel One API Credentials (from key.txt or env; env can use ANGELONE_TRADING_* etc.)
-    ANGEL_ONE_API_KEY = _angel_env("ANGEL_ONE_API_KEY", "ANGELONE_TRADING_API_KEY") or key_data.get('api_key') or os.getenv('ANGEL_ONE_API_KEY', '')
-    ANGEL_ONE_CLIENT_SECRET = _angel_env("ANGEL_ONE_CLIENT_SECRET", "ANGELONE_TRADING_SECRET_KEY") or key_data.get('client_secret') or os.getenv('ANGEL_ONE_CLIENT_SECRET', '')
-    ANGEL_ONE_CLIENT_ID = _angel_env("ANGEL_ONE_CLIENT_ID", "AUTH_USERNAME") or key_data.get('client_code') or os.getenv('ANGEL_ONE_CLIENT_ID', '')
-    ANGEL_ONE_PASSWORD = _angel_env("ANGEL_ONE_PASSWORD", "AUTH_PASSWORD") or key_data.get('password') or os.getenv('ANGEL_ONE_PASSWORD', '')
-    ANGEL_ONE_TOTP_SECRET = key_data.get('totp_secret') or os.getenv('ANGEL_ONE_TOTP_SECRET', '').strip() or os.getenv('ANGELONE_TOTP_SECRET', '').strip()
-    # Angel One now uses mPIN (4-digit) for login; if set, use it instead of password for generateSession
+    # Angel One API Credentials (from .env only; alt names ANGELONE_TRADING_*, AUTH_USERNAME, etc.)
+    ANGEL_ONE_API_KEY = _angel_env("ANGEL_ONE_API_KEY", "ANGELONE_TRADING_API_KEY") or os.getenv('ANGEL_ONE_API_KEY', '')
+    ANGEL_ONE_CLIENT_SECRET = _angel_env("ANGEL_ONE_CLIENT_SECRET", "ANGELONE_TRADING_SECRET_KEY") or os.getenv('ANGEL_ONE_CLIENT_SECRET', '')
+    ANGEL_ONE_CLIENT_ID = _angel_env("ANGEL_ONE_CLIENT_ID", "AUTH_USERNAME") or os.getenv('ANGEL_ONE_CLIENT_ID', '')
+    ANGEL_ONE_PASSWORD = _angel_env("ANGEL_ONE_PASSWORD", "AUTH_PASSWORD") or os.getenv('ANGEL_ONE_PASSWORD', '')
+    ANGEL_ONE_TOTP_SECRET = (os.getenv('ANGEL_ONE_TOTP_SECRET') or os.getenv('ANGELONE_TOTP_SECRET') or '').strip()
     ANGEL_ONE_MPIN = (os.getenv('ANGEL_ONE_MPIN') or '').strip()
-    # Key as 5-tuple for TOTP from 5th field: key_secret[4] = totp_secret
+    # Tuple for broker: (api_key, client_secret, client_code, password, totp_secret)
     KEY_SECRET = (ANGEL_ONE_API_KEY, ANGEL_ONE_CLIENT_SECRET, ANGEL_ONE_CLIENT_ID, ANGEL_ONE_PASSWORD, ANGEL_ONE_TOTP_SECRET)
 
     # Trading Configuration (invalid env = use default)
