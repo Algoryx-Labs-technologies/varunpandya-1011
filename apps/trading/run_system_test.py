@@ -17,9 +17,13 @@ LOG_DIR = APP_ROOT / "logs"
 LOG_DIR.mkdir(exist_ok=True)
 LOG_FILE = LOG_DIR / f"system_test_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
 
+import os
 import logging
+# Use INFO so DEBUG lines (urllib3, SmartApi, etc.) don't clutter logs; set LOG_LEVEL=DEBUG in .env for troubleshooting
+_log_level = os.getenv("LOG_LEVEL", "INFO").upper()
+_level = getattr(logging, _log_level, logging.INFO)
 logging.basicConfig(
-    level=logging.DEBUG,
+    level=_level,
     format="%(asctime)s | %(levelname)s | %(message)s",
     handlers=[
         logging.FileHandler(LOG_FILE, encoding="utf-8"),
@@ -27,6 +31,9 @@ logging.basicConfig(
     ],
 )
 log = logging.getLogger("system_test")
+# Suppress noisy third-party DEBUG in system test logs
+for _name in ("urllib3", "SmartApi", "logzero", "requests"):
+    logging.getLogger(_name).setLevel(logging.WARNING)
 
 def section(name: str) -> None:
     log.info("=" * 60)
@@ -162,7 +169,9 @@ def test_broker() -> None:
         except Exception as e:
             log.warning("  get_profile error: %s", e)
     else:
-        log.warning("  Broker connect failed (check credentials/TOTP)")
+        err = getattr(broker, "last_error", (None, None))
+        msg, code = err if isinstance(err, (tuple, list)) else (err, "")
+        log.warning("  Broker connect failed: %s (errorcode=%s)", msg or "check credentials/TOTP", code or "—")
 
 def test_backend_api() -> None:
     section("BACKEND API (health)")

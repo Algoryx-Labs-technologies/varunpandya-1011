@@ -1,12 +1,13 @@
 """
 Angel One SmartAPI Integration Module
 Handles authentication, order placement, and position management.
-Login matches key.txt format: api_key client_secret client_code password_or_mpin totp_secret
-Example: obj = SmartConnect(api_key=key_secret[0]); obj.generateSession(key_secret[2], key_secret[3], TOTP(key_secret[4]).now())
+Login matches key.txt format: api_key client_secret client_code password totp_secret
+  -> SmartConnect(api_key=key_secret[0]); generateSession(key_secret[2], key_secret[3], TOTP(key_secret[4]).now())
 """
 import time
 import pyotp
-from SmartApi.smartConnect import SmartConnect
+from pyotp import TOTP
+from SmartApi import SmartConnect
 from typing import Dict, List, Optional, Any
 from loguru import logger
 import json
@@ -14,9 +15,20 @@ from datetime import datetime
 from config import Config
 
 
+def _totp_code(secret: str) -> str:
+    """Generate 6-digit TOTP for Angel One (30s interval, base32 secret). Supports raw secret or otpauth:// URI."""
+    secret = (secret or "").strip()
+    if not secret:
+        return ""
+    if secret.lower().startswith("otpauth://"):
+        t = pyotp.parse_uri(secret)
+        return t.now()
+    return TOTP(secret, interval=30, digits=6).now()
+
+
 class AngelOneBroker:
     """Wrapper class for Angel One SmartAPI"""
-    
+
     def __init__(self):
         self.api_key = Config.ANGEL_ONE_API_KEY
         self.client_id = Config.ANGEL_ONE_CLIENT_ID
@@ -25,43 +37,54 @@ class AngelOneBroker:
         self.obj = None
         self.feed_token = None
         self.jwt_token = None
-        
+        self.last_error = None  # (message, errorcode) after failed connect
+
     def connect(self) -> bool:
-        """Authenticate with Angel One. Uses KEY_SECRET (key.txt or .env): generateSession(key_secret[2], key_secret[3], TOTP(key_secret[4]).now())."""
+        """Authenticate with Angel One API. Uses KEY_SECRET (key.txt or .env): generateSession(client_code, pin, TOTP)."""
+        self.last_error = None
         try:
             key_secret = getattr(Config, "KEY_SECRET", None) or (self.api_key, "", self.client_id, self.password, self.totp_secret or "")
-            if not (key_secret[0] and key_secret[2]):
-                logger.error("Missing broker credentials. Use key.txt (5 space-separated values) or set ANGEL_ONE_* in .env")
-                return False
+            api_key = (key_secret[0] or "").strip()
+            client_code = (key_secret[2] or "").strip()
             totp_secret = (key_secret[4] or "").strip()
-            if not totp_secret:
-                logger.error("TOTP secret (key_secret[4]) is empty. Add to key.txt or ANGEL_ONE_TOTP_SECRET in .env")
+            if not api_key or not client_code or not totp_secret:
+                self.last_error = ("Missing api_key, client_code or totp_secret", "")
+                logger.error("Missing credentials. Set ANGEL_ONE_API_KEY, ANGEL_ONE_CLIENT_ID, ANGEL_ONE_TOTP_SECRET (or use key.txt)")
                 return False
-            # Second arg: mPIN if set, else key_secret[3] (password/mPIN from key.txt or .env)
             login_pin = (getattr(Config, "ANGEL_ONE_MPIN", None) or "").strip() or (key_secret[3] or "").strip()
             if not login_pin:
-                logger.error("Set password/mPIN: 4th value in key.txt or ANGEL_ONE_MPIN / ANGEL_ONE_PASSWORD in .env")
+                self.last_error = ("Missing password/mPIN", "")
+                logger.error("Set ANGEL_ONE_PASSWORD or ANGEL_ONE_MPIN in .env (or 4th field in key.txt)")
                 return False
-            self.obj = SmartConnect(api_key=key_secret[0])
+            auth_type = "MPIN" if (getattr(Config, "ANGEL_ONE_MPIN", None) or "").strip() else "password"
+            logger.info(f"Angel One login attempt (client_code={client_code}, auth={auth_type})")
+            self.obj = SmartConnect(api_key=api_key)
             for attempt in range(2):
-                totp_code = pyotp.TOTP(key_secret[4]).now()
-                data = self.obj.generateSession(key_secret[2], login_pin, totp_code)
+                totp_code = _totp_code(totp_secret)
+                if not totp_code:
+                    self.last_error = ("TOTP generation failed (check ANGEL_ONE_TOTP_SECRET)", "")
+                    logger.error("TOTP generation failed. Use base32 secret from https://smartapi.angelone.in/enable-totp")
+                    return False
+                data = self.obj.generateSession(client_code, login_pin, totp_code)
                 if data.get('status'):
                     self.jwt_token = data['data']['jwtToken']
                     self.feed_token = data['data']['feedToken']
                     mode = "PAPER" if getattr(Config, "PAPER_TRADING", True) else "LIVE"
-                    logger.info(f"Connected to Angel One API (mode={mode}, no real orders in paper mode)")
+                    logger.info("Angel One connected (mode=%s)", mode)
                     return True
-                msg = (data.get('message') or "").lower()
-                if "invalid totp" in msg and attempt == 0:
-                    logger.warning("TOTP rejected, retrying with fresh code in 2s...")
+                msg = data.get('message') or "Unknown error"
+                errcode = data.get('errorcode') or ""
+                self.last_error = (msg, errcode)
+                if "invalid totp" in msg.lower() and attempt == 0:
+                    logger.warning(f"TOTP rejected (errorcode={errcode or 'AB1050'}), retrying with fresh code in 2s...")
                     time.sleep(2)
                     continue
-                logger.error(f"Failed to connect: {data.get('message', 'Unknown error')}")
+                logger.error(f"Angel One login failed: {msg} (errorcode={errcode})")
                 return False
             return False
         except Exception as e:
-            logger.error(f"Error connecting to Angel One: {str(e)}")
+            self.last_error = (str(e), "")
+            logger.error("Angel One connect error: %s", e)
             return False
     
     def get_profile(self) -> Optional[Dict]:
