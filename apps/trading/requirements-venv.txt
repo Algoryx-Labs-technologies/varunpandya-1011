@@ -1,0 +1,26 @@
+# Install with: venv\Scripts\pip install -r requirements-venv.txt
+# TA-Lib: On Windows use pre-built wheel (pip install TA-Lib often fails). One option:
+#   pip install https://github.com/cgohlke/talib-build/releases/download/v0.6.8/ta_lib-0.6.8-cp311-cp311-win_amd64.whl
+# Project C library at repo root ta-lib-0.6.4\bin is added to DLL path when present (run scripts set PATH).
+ta-lib>=0.6.8
+smartapi-python>=1.3.0,<1.6
+logzero>=1.7.0
+websocket-client>=1.0.0
+pandas==2.1.4
+numpy==1.26.2
+openpyxl>=3.0.0
+ta==0.11.0
+scikit-learn==1.3.2
+requests==2.31.0
+httpx==0.25.2
+asyncio==3.4.3
+schedule==1.2.0
+python-dotenv==1.0.0
+pyyaml==6.0.1
+python-dateutil==2.8.2
+pytz==2023.3
+pyotp==2.9.0
+flask==3.0.0
+flask-cors==4.0.0
+loguru==0.7.2
+pytest>=7.0.0

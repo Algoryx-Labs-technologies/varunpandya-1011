@@ -118,11 +118,14 @@ class RiskManager:
             return False
     
     def execute_kill_switch(self):
-        """Execute kill switch: cancel all orders, square off all positions at LTP, wait 30s, then lock."""
+        """Execute kill switch: cancel all orders, square off all positions at LTP, wait 30s, then lock. No-op in paper mode."""
         logger.warning("Executing kill switch...")
         alert(ALERT_CRITICAL, "Kill switch executed", {"time": datetime.now().isoformat()})
         try:
-            self.broker.squareoff(exchange=Config.EXCHANGE, wait_seconds=30)
+            if not getattr(Config, "PAPER_TRADING", False):
+                self.broker.squareoff(exchange=Config.EXCHANGE, wait_seconds=30)
+            else:
+                logger.info("[PAPER] Kill switch: skipping squareoff")
             with self._lock:
                 self.auto_locked = True
             logger.info("Kill switch executed successfully")

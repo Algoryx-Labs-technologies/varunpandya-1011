@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Trading bot monorepo with custom backend and frontend",
   "private": true,
+  "type": "module",
   "workspaces": [
     "apps/backend",
     "apps/frontend"
@@ -13,7 +14,9 @@
     "dev:frontend": "npm run dev --workspace=@trading/frontend",
     "build": "npm run build --workspaces",
     "start:backend": "npm start --workspace=@trading/backend",
-    "start:frontend": "npm run preview --workspace=@trading/frontend"
+    "start:frontend": "npm run preview --workspace=@trading/frontend",
+    "run:system": "node run-system.js",
+    "run:bot": "node run-bot.js"
   },
   "devDependencies": {},
   "engines": {

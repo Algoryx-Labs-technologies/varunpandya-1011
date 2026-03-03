@@ -56,6 +56,15 @@
   box-shadow: 0 0 14px var(--accent-red-dim);
 }
 
+.app-offline-banner {
+  background: rgba(212, 168, 83, 0.15);
+  border-bottom: 1px solid var(--accent-gold);
+  color: var(--text-secondary);
+  font-size: 0.8125rem;
+  padding: 0.5rem 1.75rem;
+  text-align: center;
+}
+
 .status-indicator.market-closed {
   background: var(--accent-gold, #d4a853);
   box-shadow: 0 0 10px rgba(212, 168, 83, 0.4);

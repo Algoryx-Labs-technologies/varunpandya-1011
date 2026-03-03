@@ -59,7 +59,7 @@ async function main() {
     cwd: frontendDir,
     env: { ...process.env, VITE_API_PORT: String(port) },
     stdio: 'inherit',
-    shell: isWin,
+    shell: false,
   });
   frontend.on('error', (err) => {
     console.error('Frontend error:', err);

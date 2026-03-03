@@ -30,8 +30,25 @@ def load_key_file(filepath: str = 'key.txt') -> Dict[str, str]:
         print(f"Error loading key.txt: {e}")
         return {}
 
-# Load from key.txt first, then fallback to env
+# Load from key.txt first, then fallback to env (including ANGELONE_* alternative names)
 key_data = load_key_file()
+
+
+_ANGEL_KEY_MAP = {"ANGEL_ONE_API_KEY": "api_key", "ANGEL_ONE_CLIENT_SECRET": "client_secret", "ANGEL_ONE_CLIENT_ID": "client_code", "ANGEL_ONE_PASSWORD": "password", "ANGEL_ONE_TOTP_SECRET": "totp_secret"}
+
+
+def _angel_env(env_key: str, alt_key: str = None) -> str:
+    """Get Angel One credential: key.txt -> ANGEL_ONE_* -> alt env (e.g. ANGELONE_TRADING_API_KEY, AUTH_USERNAME)."""
+    if isinstance(key_data, dict):
+        k = _ANGEL_KEY_MAP.get(env_key)
+        if k and key_data.get(k):
+            return key_data.get(k)
+    val = (os.getenv(env_key) or "").strip()
+    if val:
+        return val
+    if alt_key:
+        return (os.getenv(alt_key) or "").strip()
+    return ""
 
 
 def _float_env(key: str, default: float) -> float:
@@ -53,12 +70,12 @@ def _int_env(key: str, default: int) -> int:
 class Config:
     """Central configuration class"""
     
-    # Angel One API Credentials (from key.txt or env)
-    ANGEL_ONE_API_KEY = key_data.get('api_key') or os.getenv('ANGEL_ONE_API_KEY', '')
-    ANGEL_ONE_CLIENT_SECRET = key_data.get('client_secret') or os.getenv('ANGEL_ONE_CLIENT_SECRET', '')
-    ANGEL_ONE_CLIENT_ID = key_data.get('client_code') or os.getenv('ANGEL_ONE_CLIENT_ID', '')
-    ANGEL_ONE_PASSWORD = key_data.get('password') or os.getenv('ANGEL_ONE_PASSWORD', '')
-    ANGEL_ONE_TOTP_SECRET = key_data.get('totp_secret') or os.getenv('ANGEL_ONE_TOTP_SECRET', '')
+    # Angel One API Credentials (from key.txt or env; env can use ANGELONE_TRADING_* etc.)
+    ANGEL_ONE_API_KEY = _angel_env("ANGEL_ONE_API_KEY", "ANGELONE_TRADING_API_KEY") or key_data.get('api_key') or os.getenv('ANGEL_ONE_API_KEY', '')
+    ANGEL_ONE_CLIENT_SECRET = _angel_env("ANGEL_ONE_CLIENT_SECRET", "ANGELONE_TRADING_SECRET_KEY") or key_data.get('client_secret') or os.getenv('ANGEL_ONE_CLIENT_SECRET', '')
+    ANGEL_ONE_CLIENT_ID = _angel_env("ANGEL_ONE_CLIENT_ID", "AUTH_USERNAME") or key_data.get('client_code') or os.getenv('ANGEL_ONE_CLIENT_ID', '')
+    ANGEL_ONE_PASSWORD = _angel_env("ANGEL_ONE_PASSWORD", "AUTH_PASSWORD") or key_data.get('password') or os.getenv('ANGEL_ONE_PASSWORD', '')
+    ANGEL_ONE_TOTP_SECRET = key_data.get('totp_secret') or os.getenv('ANGEL_ONE_TOTP_SECRET', '').strip() or os.getenv('ANGELONE_TOTP_SECRET', '').strip()
     
     # Trading Configuration (invalid env = use default)
     TRADING_CAPITAL = _float_env('TRADING_CAPITAL', 20000.0)
@@ -73,6 +90,16 @@ class Config:
     KILL_SWITCH_TIME = os.getenv('KILL_SWITCH_TIME', '15:15')
     STOP_LOSS_PERCENTAGE = _float_env('STOP_LOSS_PERCENTAGE', 2.0)
     TARGET_PERCENTAGE = _float_env('TARGET_PERCENTAGE', 1.5)
+
+    # Paper vs Live: PAPER_TRADING=true (default) = no real orders, only data/signals/logs. Set PAPER_TRADING=false or TRADING_MODE=live for live orders.
+    _paper_raw = os.getenv('PAPER_TRADING', 'true').strip().lower()
+    _mode = (os.getenv('TRADING_MODE') or '').strip().lower()
+    if _mode == 'live':
+        PAPER_TRADING = False
+    elif _mode == 'paper':
+        PAPER_TRADING = True
+    else:
+        PAPER_TRADING = _paper_raw in ('1', 'true', 'yes')
 
     # Trade cycle: stop new trades when net PnL reaches target % of capital (user opt-in)
     ENABLE_NET_PNL_TARGET = os.getenv('ENABLE_NET_PNL_TARGET', 'false').strip().lower() in ('1', 'true', 'yes')

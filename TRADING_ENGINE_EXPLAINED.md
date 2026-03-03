@@ -445,7 +445,7 @@ From the **repo root**:
 npm install
 ```
 
-This installs dependencies for the backend and frontend (npm workspaces).  
+This installs dependencies for the backend and frontend (npm workspaces). The frontend uses **@vitejs/plugin-react-swc** (no Babel required).  
 From **`apps/trading/`** (for the bot):
 
 ```bash
@@ -535,8 +535,14 @@ If you prefer not to use `run-all.js`:
 | What you want              | Command / steps |
 |----------------------------|-----------------|
 | Web app only (no bot)      | Repo root → `node run-all.js` → open http://localhost:5173 |
-| Full system (web + bot)    | 1) Repo root → `node run-all.js` and note backend port. 2) `apps/trading/.env`: set Angel One + `BACKEND_API_URL=http://localhost:<port>`. 3) `apps/trading` → `python main.py`. 4) Use http://localhost:5173 in the browser. |
+| Full system (web + bot)    | Repo root → `npm run run:system` or `node run-system.js` (starts backend+frontend, then bot; BACKEND_API_URL set from .env.local). Or: 1) `node run-all.js` and note port. 2) Set `BACKEND_API_URL` in .env. 3) `npm run run:bot` or `node run-bot.js`. 4) Open http://localhost:5173. |
 | Backend only               | `apps/backend` → `npm run dev` (or set `PORT` and run `node src/index.js`). |
 | Frontend only (needs backend) | Set `VITE_API_PORT` in `apps/frontend/.env.local` to backend port, then `apps/frontend` → `npm run dev`. |
+
+### Troubleshooting
+
+- **Vite/frontend build or dev errors:** Run **`npm install`** from the **repo root**. The frontend uses `@vitejs/plugin-react-swc` (no Babel). If the frontend was recently updated, run `npm install` again.
+- **Frontend port in use:** Vite will try the next port (e.g. 5174, 5175). Use the URL printed in the terminal.
+- **Backend not reachable:** Ensure `run-all.js` (or the backend) is running and that `VITE_API_PORT` in `apps/frontend/.env.local` matches the backend port.
 
 **Market status (Live / Market closed):** The backend uses system time converted to IST. No extra setup; ensure the machine’s clock (or server time) is correct if you rely on accurate market hours.

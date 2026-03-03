@@ -11,9 +11,19 @@ Custom React frontend for the trading bot dashboard.
 
 ## Installation
 
+From repo root (recommended, installs all workspaces):
+
 ```bash
 npm install
 ```
+
+Or from this directory:
+
+```bash
+npm install
+```
+
+**Note:** The frontend uses `@vitejs/plugin-react-swc` (SWC-based React plugin); no Babel is required. Run `npm install` from repo root so all workspace dependencies are installed.
 
 ## Development
 

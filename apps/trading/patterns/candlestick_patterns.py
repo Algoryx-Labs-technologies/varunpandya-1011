@@ -1,40 +1,72 @@
 """
 Candlestick Pattern Detection Module
-Uses TA-Lib for vectorized pattern detection
+Uses TA-Lib for vectorized pattern detection when available; otherwise no pattern columns.
+Uses project-local C library at repo_root/ta-lib-0.6.4/bin (ta-lib.dll) when present.
 """
+import os
+from pathlib import Path
+
+# Add project TA-Lib C library bin to DLL search path (Windows) before importing talib
+_repo_root = Path(__file__).resolve().parents[3]
+_talib_bin = _repo_root / "ta-lib-0.6.4" / "bin"
+if _talib_bin.is_dir():
+    try:
+        os.add_dll_directory(str(_talib_bin))
+    except Exception:
+        pass
+
 import pandas as pd
 import numpy as np
-import talib
 from typing import List, Dict, Optional
 from loguru import logger
 from config import Config
 
+try:
+    import talib
+    HAS_TALIB = True
+except ImportError:
+    talib = None
+    HAS_TALIB = False
 
-class CandlestickPatternDetector:
-    """Detects candlestick patterns using TA-Lib"""
-    
-    # Bullish patterns
-    BULLISH_PATTERNS = {
+
+def _bullish_patterns_dict():
+    if talib is None:
+        return {}
+    return {
         'HAMMER': talib.CDLHAMMER,
-        'SPINNING_TOP_BULLISH': talib.CDLSPINNINGTOP,  # Need to filter for bullish
-        'BULLISH_KICKER': talib.CDLKICKINGBYLENGTH,  # Need to filter
-        'BULLISH_ENGULFING': talib.CDLENGULFING,  # Need to filter
+        'SPINNING_TOP_BULLISH': talib.CDLSPINNINGTOP,
+        'BULLISH_KICKER': talib.CDLKICKINGBYLENGTH,
+        'BULLISH_ENGULFING': talib.CDLENGULFING,
         'MORNING_DOJI_STAR': talib.CDLMORNINGDOJISTAR,
         'MORNING_STAR': talib.CDLMORNINGSTAR,
         'THREE_WHITE_SOLDIERS': talib.CDL3WHITESOLDIERS,
     }
-    
-    # Bearish patterns
-    BEARISH_PATTERNS = {
+
+
+def _bearish_patterns_dict():
+    if talib is None:
+        return {}
+    return {
         'SHOOTING_STAR': talib.CDLSHOOTINGSTAR,
-        'SPINNING_TOP_BEARISH': talib.CDLSPINNINGTOP,  # Need to filter
-        'BEARISH_ENGULFING': talib.CDLENGULFING,  # Need to filter
-        'BEARISH_KICKER': talib.CDLKICKINGBYLENGTH,  # Need to filter
+        'SPINNING_TOP_BEARISH': talib.CDLSPINNINGTOP,
+        'BEARISH_ENGULFING': talib.CDLENGULFING,
+        'BEARISH_KICKER': talib.CDLKICKINGBYLENGTH,
         'EVENING_DOJI_STAR': talib.CDLEVENINGDOJISTAR,
         'EVENING_STAR': talib.CDLEVENINGSTAR,
         'THREE_BLACK_CROWS': talib.CDL3BLACKCROWS,
     }
-    
+
+
+BULLISH_PATTERNS = _bullish_patterns_dict()
+BEARISH_PATTERNS = _bearish_patterns_dict()
+
+
+class CandlestickPatternDetector:
+    """Detects candlestick patterns using TA-Lib when available."""
+
+    BULLISH_PATTERNS = BULLISH_PATTERNS
+    BEARISH_PATTERNS = BEARISH_PATTERNS
+
     def __init__(self):
         self.min_body_size = Config.MIN_CANDLE_BODY_SIZE
         self.min_wick_ratio = Config.MIN_WICK_RATIO

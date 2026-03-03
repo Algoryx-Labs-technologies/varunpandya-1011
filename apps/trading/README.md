@@ -15,6 +15,25 @@ A comprehensive Python-based trading bot for options trading using Angel One Sma
 
 ## Installation
 
+### Using the venv (recommended)
+
+From `apps/trading`:
+
+```powershell
+py -m venv venv
+.\venv\Scripts\pip install -r requirements-venv.txt
+```
+
+**TA-Lib (venv):** The project can use the C library at repo root `ta-lib-0.6.4\` if present. On Windows, `pip install` of TA-Lib often fails; install the Python wrapper from a pre-built wheel, e.g.:
+
+```powershell
+.\venv\Scripts\pip install "https://github.com/cgohlke/talib-build/releases/download/v0.6.8/ta_lib-0.6.8-cp311-cp311-win_amd64.whl"
+```
+
+(Use the wheel that matches your Python version from [cgohlke/talib-build releases](https://github.com/cgohlke/talib-build/releases).) Without TA-Lib the bot still runs but candlestick pattern detection is skipped.
+
+### Or install globally
+
 1. Install Python dependencies:
 ```bash
 pip install -r requirements.txt
@@ -38,9 +57,40 @@ ANGEL_ONE_PASSWORD=your_password
 ANGEL_ONE_TOTP_SECRET=your_totp_secret
 ```
 
+## Paper vs Live Trading
+
+- **Paper (default):** No real orders. Set `PAPER_TRADING=true` in `.env` (or leave unset). Data, signals, and logs are still fetched and sent to the backend; orders are only simulated.
+- **Live:** Real orders sent to the broker. Set `PAPER_TRADING=false` or `TRADING_MODE=live` in `.env`. Use with caution.
+
+Broker connection (Angel One) is required for both modes (for market data). You must set `ANGEL_ONE_TOTP_SECRET` in `.env` (from Angel One app / API 2FA) for the bot to connect.
+
 ## Usage
 
-### Running the Trading Bot
+### Getting the system running
+
+1. Copy `apps/trading/.env.example` to `apps/trading/.env` and set:
+   - Angel One: `ANGEL_ONE_API_KEY`, `ANGEL_ONE_CLIENT_SECRET`, `ANGEL_ONE_CLIENT_ID`, `ANGEL_ONE_PASSWORD`, **`ANGEL_ONE_TOTP_SECRET`** (required for login).
+   - `BACKEND_API_URL=http://localhost:3000` (default).
+   - `PAPER_TRADING=true` for paper mode (default), or `false` for live.
+2. From repo root run:
+
+```bash
+npm run run:system
+```
+
+or `node run-system.js`. This installs Node deps if needed, starts backend + frontend in the background, then the trading bot in the current terminal (venv). Open the frontend URL shown in the other window (e.g. http://localhost:5173).
+
+### Running the Trading Bot only
+
+With venv, from repo root:
+
+```bash
+npm run run:bot
+```
+
+or `node run-bot.js`. From `apps/trading` you can run `.\venv\Scripts\python main.py` (Windows) or `venv/bin/python main.py` (Unix) after setting `BACKEND_API_URL` to match the backend port.
+
+Without venv:
 
 ```bash
 python main.py
@@ -134,3 +184,38 @@ Trades are automatically logged to:
 - Credentials: use **key.txt** (one line: api_key client_secret client_code password totp_secret) or set env vars; see `.env.example`.
 - Ensure TA-Lib is properly installed for full indicator/auto-level support.
 - Backend integration is optional; without it the bot still runs but won't push data to the web UI. For full stack, run backend + frontend from repo root with `node run-all.js`, then start the bot with `BACKEND_API_URL` set to the backend port.
+
+## Run everything and store logs
+
+Run the full Python trading engine (system test + trading bot); all output is stored in `logs/`:
+
+```bash
+python run_all_and_log.py
+```
+
+Or with venv: `.\venv\Scripts\python run_all_and_log.py` (Windows) / `venv/bin/python run_all_and_log.py` (Unix).
+
+**Log locations:**
+
+| Source | File |
+|--------|------|
+| Trading bot (main.py) | `logs/trading.log` (daily rotation, 30-day retention) |
+| System test | `logs/system_test_YYYYMMDD_HHMMSS.log` (one per run) |
+
+The script runs the system test first (config, indicators, patterns, levels, strikes, ML, broker check, backend health), then the trading bot. The bot exits quickly if `ANGEL_ONE_TOTP_SECRET` is not set; its log is still written to `trading.log`.
+
+## System test only
+
+To run only the system test (no bot), with output to file and console:
+
+```powershell
+.\venv\Scripts\python.exe run_system_test.py
+```
+
+Logs are written to `logs/system_test_YYYYMMDD_HHMMSS.log` and printed to the terminal.
+
+## Debugging / Common issues
+
+- **`ModuleNotFoundError: No module named 'smartapi'`** – The Angel One package imports as `SmartApi` (capital S, A). Use `from SmartApi import SmartConnect`. If you see missing **logzero** or **websocket**, run `pip install -r requirements-venv.txt` (they are listed as dependencies).
+- **Tests:** From `apps/trading`, run `.\venv\Scripts\python.exe -m pytest tests/ -v`. Pytest is in `requirements-venv.txt`.
+- **TA-Lib:** If the folder `ta-lib-0.6.4` is missing at repo root, the bot still runs using the Python TA-Lib wheel (no local DLL). Run scripts add the folder to PATH only when present.

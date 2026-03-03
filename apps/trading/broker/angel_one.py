@@ -4,7 +4,7 @@ Handles authentication, order placement, and position management
 """
 import time
 import pyotp
-from smartapi import SmartConnect
+from SmartApi import SmartConnect
 from typing import Dict, List, Optional, Any
 from loguru import logger
 import json
@@ -25,30 +25,35 @@ class AngelOneBroker:
         self.jwt_token = None
         
     def connect(self) -> bool:
-        """Initialize and authenticate with Angel One API"""
+        """Initialize and authenticate with Angel One API. Requires ANGEL_ONE_TOTP_SECRET in .env for 2FA."""
         try:
+            if not (self.api_key and self.client_id and self.password):
+                logger.error("Missing broker credentials. Set ANGEL_ONE_API_KEY, ANGEL_ONE_CLIENT_ID, ANGEL_ONE_PASSWORD in .env")
+                return False
+            totp_secret = (self.totp_secret or "").strip()
+            if not totp_secret:
+                logger.error(
+                    "ANGEL_ONE_TOTP_SECRET is empty. Add your Angel One TOTP/2FA secret in .env to connect. "
+                    "Get it from Angel One app (Settings > API) or your 2FA setup."
+                )
+                return False
             self.obj = SmartConnect(api_key=self.api_key)
-            
-            # Generate TOTP
-            totp = pyotp.TOTP(self.totp_secret)
+            totp = pyotp.TOTP(totp_secret)
             totp_code = totp.now()
-            
-            # Generate session
             data = self.obj.generateSession(
                 self.client_id,
                 self.password,
                 totp_code
             )
-            
             if data['status']:
                 self.jwt_token = data['data']['jwtToken']
                 self.feed_token = data['data']['feedToken']
-                logger.info("Successfully connected to Angel One API")
+                mode = "PAPER" if getattr(Config, "PAPER_TRADING", True) else "LIVE"
+                logger.info(f"Connected to Angel One API (mode={mode}, no real orders in paper mode)")
                 return True
             else:
                 logger.error(f"Failed to connect: {data['message']}")
                 return False
-                
         except Exception as e:
             logger.error(f"Error connecting to Angel One: {str(e)}")
             return False

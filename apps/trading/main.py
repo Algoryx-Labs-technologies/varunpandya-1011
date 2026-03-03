@@ -57,8 +57,11 @@ class TradingBot:
     
     def initialize(self) -> bool:
         """Initialize the trading bot"""
+        mode = "PAPER (no real orders)" if getattr(Config, "PAPER_TRADING", True) else "LIVE (real orders)"
+        logger.info(f"Trading mode: {mode}")
         logger.info("Initializing trading bot...")
-        
+        if not getattr(Config, "PAPER_TRADING", True):
+            logger.warning("LIVE trading enabled - orders will be sent to broker")
         # Connect to broker
         if not self.broker.connect():
             logger.error("Failed to connect to Angel One API")
@@ -238,7 +241,15 @@ class TradingBot:
             # Get option token (would need to fetch from broker)
             option_token = str(selected_strike)  # Placeholder; in production fetch from broker instrument list
 
-            # Place order
+            # Place order (skip in paper trading mode)
+            paper = getattr(Config, 'PAPER_TRADING', False)
+            if paper:
+                logger.info(
+                    f"[PAPER] Would place {signal.direction} {index} @ {selected_strike} | Qty: {quantity} | Price: {option_price}"
+                )
+                self.backend_api.send_trade_signal({**signal.to_dict(), "paper": True})
+                self.backend_api.send_trading_log("info", f"Paper: signal (no order) {signal.direction} {index} @ {selected_strike}", {"paper": True})
+                return
             if signal.direction == 'call':
                 order_response = self.broker.place_buy_order(
                     symbol=option_symbol,
@@ -255,7 +266,6 @@ class TradingBot:
                     price=option_price,
                     order_type="LIMIT"
                 )
-            
             if order_response and order_response.get('status'):
                 signal.status = 'executed'
                 signal.order_id = order_response.get('data', {}).get('orderid')
@@ -306,25 +316,27 @@ class TradingBot:
     def _exit_trade(self, signal: TradeSignal, exit_price: float, reason: str):
         """Exit a trade"""
         try:
-            # Place exit order (opposite of entry)
-            if signal.direction == 'call':
-                # Sell to exit call
-                self.broker.place_sell_order(
-                    symbol=signal.index,  # Would need actual symbol
-                    token="",  # Would need actual token
-                    quantity=1,  # Would need actual quantity
-                    price=exit_price,
-                    order_type="MARKET"
-                )
+            paper = getattr(Config, 'PAPER_TRADING', False)
+            if not paper:
+                # Place exit order (opposite of entry)
+                if signal.direction == 'call':
+                    self.broker.place_sell_order(
+                        symbol=signal.index,
+                        token="",
+                        quantity=1,
+                        price=exit_price,
+                        order_type="MARKET"
+                    )
+                else:
+                    self.broker.place_buy_order(
+                        symbol=signal.index,
+                        token="",
+                        quantity=1,
+                        price=exit_price,
+                        order_type="MARKET"
+                    )
             else:
-                # Buy to exit put
-                self.broker.place_buy_order(
-                    symbol=signal.index,
-                    token="",
-                    quantity=1,
-                    price=exit_price,
-                    order_type="MARKET"
-                )
+                logger.info(f"[PAPER] Would exit {signal.direction} {signal.index} @ {exit_price} | Reason: {reason}")
             
             # Calculate P&L
             pnl = (exit_price - signal.entry_price) * 1  # Simplified - would use actual quantity

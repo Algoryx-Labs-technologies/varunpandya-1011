@@ -63,6 +63,11 @@ function App() {
           <span>{statusLabel}</span>
         </div>
       </header>
+      {!connected && (
+        <div className="app-offline-banner" role="alert">
+          Backend offline — start the backend and trading bot to see live data (Dashboard, Trading, Signals, etc.). This tab still works for Discover and layout.
+        </div>
+      )}
 
       <nav className="app-nav">
         {TABS.map(({ id, label }) => (
