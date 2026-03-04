@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import type { RouteKey } from '../constants/routes'
-import { loginToAngelOne } from '../utils/api'
+import { loginToAngelOne, startMarketDataStream } from '../utils/api'
 import { saveAngelOneToken, saveAngelOneRefreshToken } from '../utils/auth'
 
 interface AuthProps {
@@ -130,6 +130,14 @@ export default function Auth({ onNavigate }: AuthProps) {
         saveAngelOneToken(loginResponse.data.jwtToken)
         if (loginResponse.data.refreshToken) {
           saveAngelOneRefreshToken(loginResponse.data.refreshToken)
+        }
+        // Start real-time price stream on backend (optional; backend may already have env credentials)
+        if (loginResponse.data.feedToken && requestData.clientcode) {
+          startMarketDataStream({
+            jwtToken: loginResponse.data.jwtToken,
+            feedToken: loginResponse.data.feedToken,
+            clientCode: requestData.clientcode,
+          }).catch(() => {})
         }
         // Set app authentication token to mark user as authenticated
         localStorage.setItem('algoryx_auth_token', 'authenticated')

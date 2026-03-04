@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react'
+import React, { useEffect, useState, useRef, useMemo } from 'react'
 import { getGreeting, formatDateLong } from '../utils/format'
 import type { DailyPnLPoint } from '../data/dashboard'
 import { getProfile, getRMSLimit, getAllHolding, getPosition, convertPosition, getTradeBook, getOrderBook, getGainersLosers, getPutCallRatio, getOIBuildup, estimateCharges, calculateMargin } from '../data/dashboard'
@@ -6,6 +6,7 @@ import type { OrderBookItem } from '../types/orderBook'
 import type { TradeBookItem } from '../types/tradeBook'
 import type { GainersLosersItem, PCRItem, OIBuildupItem, GainersLosersDataType, GainersLosersExpiryType, OIBuildupDataType, OIBuildupExpiryType, HoldingItem, TotalHolding, PositionItem } from '../types/dashboard'
 import OrderStatusWidget from './OrderStatusWidget'
+import { useWebSocket } from '../hooks/useWebSocket'
 
 function svgPathFromSeries(points: DailyPnLPoint[], width: number, height: number, isCumulative: boolean): string {
   if (!points.length) return ''
@@ -123,6 +124,9 @@ export default function Dashboard() {
   const [hasInitialLoad, setHasInitialLoad] = useState(false)
   const isMountedRef = useRef(true)
   const loadDataRef = useRef<Promise<void> | null>(null)
+  const { data: wsData } = useWebSocket()
+  const realTimeLtp = wsData?.realTimeLtp ?? {}
+  const indexTicks = useMemo(() => Object.entries(realTimeLtp).filter(([, v]) => v.symbol), [realTimeLtp])
 
   useEffect(() => {
     isMountedRef.current = true
@@ -541,6 +545,16 @@ export default function Dashboard() {
 
   return (
     <div className="page-content page-content-dashboard">
+      {indexTicks.length > 0 && (
+        <div className="dashboard-live-indices">
+          {indexTicks.map(([token, { ltp, symbol }]) => (
+            <span key={token} className="dashboard-live-index-item">
+              <strong>{symbol ?? token}</strong>{' '}
+              {typeof ltp === 'number' ? `₹${ltp.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
+            </span>
+          ))}
+        </div>
+      )}
       <div className="dashboard-top-bar">
         <div className="dashboard-monthly-pnl">
           <span className="dashboard-monthly-label">Monthly P&L</span>
@@ -767,7 +781,10 @@ export default function Dashboard() {
               </thead>
               <tbody>
                 {holdings.map((h, i) => {
-                  const pnlClass = h.profitandloss >= 0 ? 'positive' : 'negative'
+                  const liveLtp = realTimeLtp[h.symboltoken]?.ltp ?? h.ltp
+                  const pnl = (liveLtp - h.averageprice) * h.quantity
+                  const pnlPct = h.averageprice ? ((liveLtp - h.averageprice) / h.averageprice) * 100 : 0
+                  const pnlClass = pnl >= 0 ? 'positive' : 'negative'
                   return (
                     <tr
                       key={i}
@@ -777,9 +794,12 @@ export default function Dashboard() {
                       <td className="market-data-td">{h.tradingsymbol}</td>
                       <td className="market-data-td">{h.quantity}</td>
                       <td className="market-data-td">₹{h.averageprice.toFixed(2)}</td>
-                      <td className="market-data-td">₹{h.ltp.toFixed(2)}</td>
-                      <td className={`market-data-td ${pnlClass}`}>₹{h.profitandloss.toFixed(2)}</td>
-                      <td className={`market-data-td ${pnlClass}`}>{h.pnlpercentage.toFixed(2)}%</td>
+                      <td className="market-data-td">
+                        ₹{liveLtp.toFixed(2)}
+                        {realTimeLtp[h.symboltoken] && <span className="dashboard-live-dot" title="Live" />}
+                      </td>
+                      <td className={`market-data-td ${pnlClass}`}>₹{pnl.toFixed(2)}</td>
+                      <td className={`market-data-td ${pnlClass}`}>{pnlPct.toFixed(2)}%</td>
                     </tr>
                   )
                 })}
@@ -798,7 +818,7 @@ export default function Dashboard() {
                 <dt>Quantity</dt><dd>{selectedHolding.quantity}</dd>
                 <dt>Product</dt><dd>{selectedHolding.product}</dd>
                 <dt>Avg Price</dt><dd>₹{selectedHolding.averageprice.toFixed(2)}</dd>
-                <dt>LTP</dt><dd>₹{selectedHolding.ltp.toFixed(2)}</dd>
+                <dt>LTP</dt><dd>₹{(realTimeLtp[selectedHolding.symboltoken]?.ltp ?? selectedHolding.ltp).toFixed(2)}{realTimeLtp[selectedHolding.symboltoken] && <span className="dashboard-live-dot" title="Live" />}</dd>
                 <dt>Close</dt><dd>₹{selectedHolding.close?.toFixed(2) ?? '-'}</dd>
                 <dt>P&L</dt><dd className={selectedHolding.profitandloss >= 0 ? 'positive' : 'negative'}>₹{selectedHolding.profitandloss.toFixed(2)}</dd>
                 <dt>P&L %</dt><dd className={selectedHolding.pnlpercentage >= 0 ? 'positive' : 'negative'}>{selectedHolding.pnlpercentage.toFixed(2)}%</dd>

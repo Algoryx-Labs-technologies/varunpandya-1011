@@ -1870,6 +1870,40 @@ body {
   background: var(--bg-main);
 }
 
+.dashboard-live-indices {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+  padding: 10px 24px;
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  background: var(--bg-card);
+}
+
+.dashboard-live-index-item strong {
+  color: var(--text-primary);
+  margin-right: 4px;
+}
+
+.dashboard-live-dot,
+.terminal-live-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent-green);
+  margin-left: 6px;
+  vertical-align: middle;
+  animation: live-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes live-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
 .dashboard-top-bar {
   display: flex;
   align-items: center;

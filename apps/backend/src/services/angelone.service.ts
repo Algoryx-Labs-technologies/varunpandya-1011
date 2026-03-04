@@ -28,6 +28,15 @@ import {
   OIBuildupResponse,
   OptionGreekRequest,
   OptionGreekResponse,
+  GetCandleDataRequest,
+  GetCandleDataResponse,
+  GetOIDataRequest,
+  GetOIDataResponse,
+  NseIntradayResponse,
+  BseIntradayResponse,
+  CautionaryScripsResponse,
+  SearchScripRequest,
+  SearchScripResponse,
   ApiErrorResponse,
   ApiType,
   PlaceOrderRequest,
@@ -619,6 +628,208 @@ export class AngelOneService {
         throw {
           status: false,
           message: error.response.data?.message || 'Failed to fetch option greeks',
+          errorcode: error.response.data?.errorcode || 'UNKNOWN_ERROR',
+          data: error.response.data?.data,
+        } as ApiErrorResponse;
+      }
+      throw {
+        status: false,
+        message: error.message || 'Network error',
+        errorcode: 'NETWORK_ERROR',
+      } as ApiErrorResponse;
+    }
+  }
+
+  /**
+   * NSE Scrips Allowed for Intraday
+   * GET marketData/v1/nseIntraday
+   */
+  async getNseIntraday(jwtToken: string): Promise<NseIntradayResponse> {
+    try {
+      const config: AxiosRequestConfig = {
+        method: 'GET',
+        url: '/rest/secure/angelbroking/marketData/v1/nseIntraday',
+        headers: this.getHeaders({ Authorization: `Bearer ${jwtToken}` }),
+      };
+      const response = await this.axiosInstance.request<NseIntradayResponse>(config);
+      return response.data;
+    } catch (error: any) {
+      if (error.response) {
+        throw {
+          status: false,
+          message: error.response.data?.message || 'Failed to fetch NSE intraday scrips',
+          errorcode: error.response.data?.errorcode || 'UNKNOWN_ERROR',
+          data: error.response.data?.data,
+        } as ApiErrorResponse;
+      }
+      throw {
+        status: false,
+        message: error.message || 'Network error',
+        errorcode: 'NETWORK_ERROR',
+      } as ApiErrorResponse;
+    }
+  }
+
+  /**
+   * BSE Scrips Allowed for Intraday
+   * GET marketData/v1/bseIntraday
+   */
+  async getBseIntraday(jwtToken: string): Promise<BseIntradayResponse> {
+    try {
+      const config: AxiosRequestConfig = {
+        method: 'GET',
+        url: '/rest/secure/angelbroking/marketData/v1/bseIntraday',
+        headers: this.getHeaders({ Authorization: `Bearer ${jwtToken}` }),
+      };
+      const response = await this.axiosInstance.request<BseIntradayResponse>(config);
+      return response.data;
+    } catch (error: any) {
+      if (error.response) {
+        throw {
+          status: false,
+          message: error.response.data?.message || 'Failed to fetch BSE intraday scrips',
+          errorcode: error.response.data?.errorcode || 'UNKNOWN_ERROR',
+          data: error.response.data?.data,
+        } as ApiErrorResponse;
+      }
+      throw {
+        status: false,
+        message: error.message || 'Network error',
+        errorcode: 'NETWORK_ERROR',
+      } as ApiErrorResponse;
+    }
+  }
+
+  /**
+   * Cautionary Scrips
+   * GET securities/v1/cautionaryScrips. Optional query: scripconsent=yes
+   */
+  async getCautionaryScrips(
+    jwtToken: string,
+    scripconsent?: string
+  ): Promise<CautionaryScripsResponse> {
+    try {
+      const config: AxiosRequestConfig = {
+        method: 'GET',
+        url: '/rest/secure/angelbroking/securities/v1/cautionaryScrips',
+        headers: this.getHeaders({ Authorization: `Bearer ${jwtToken}` }),
+        params: scripconsent ? { scripconsent } : undefined,
+      };
+      const response = await this.axiosInstance.request<CautionaryScripsResponse>(config);
+      return response.data;
+    } catch (error: any) {
+      if (error.response) {
+        throw {
+          status: false,
+          message: error.response.data?.message || 'Failed to fetch cautionary scrips',
+          errorcode: error.response.data?.errorcode || 'UNKNOWN_ERROR',
+          data: error.response.data?.data,
+        } as ApiErrorResponse;
+      }
+      throw {
+        status: false,
+        message: error.message || 'Network error',
+        errorcode: 'NETWORK_ERROR',
+      } as ApiErrorResponse;
+    }
+  }
+
+  /**
+   * Search Scrip
+   * POST order/v1/searchScrip. One scrip per request.
+   */
+  async searchScrip(
+    jwtToken: string,
+    request: SearchScripRequest
+  ): Promise<SearchScripResponse> {
+    try {
+      const config: AxiosRequestConfig = {
+        method: 'POST',
+        url: '/rest/secure/angelbroking/order/v1/searchScrip',
+        headers: this.getHeaders({ Authorization: `Bearer ${jwtToken}` }),
+        data: JSON.stringify(request),
+      };
+      const response = await this.axiosInstance.request<SearchScripResponse>(config);
+      return response.data;
+    } catch (error: any) {
+      if (error.response) {
+        throw {
+          status: false,
+          message: error.response.data?.message || 'Failed to search scrip',
+          errorcode: error.response.data?.errorcode || 'UNKNOWN_ERROR',
+          data: error.response.data?.data,
+        } as ApiErrorResponse;
+      }
+      throw {
+        status: false,
+        message: error.message || 'Network error',
+        errorcode: 'NETWORK_ERROR',
+      } as ApiErrorResponse;
+    }
+  }
+
+  /**
+   * Historical API: Get Candle Data
+   * Returns OHLCV candles. Uses Historical API key. fromdate/todate format: "yyyy-MM-dd hh:mm"
+   */
+  async getCandleData(
+    jwtToken: string,
+    request: GetCandleDataRequest
+  ): Promise<GetCandleDataResponse> {
+    try {
+      const config: AxiosRequestConfig = {
+        method: 'POST',
+        url: '/rest/secure/angelbroking/historical/v1/getCandleData',
+        headers: this.getHeaders(
+          { Authorization: `Bearer ${jwtToken}` },
+          ApiType.HISTORICAL
+        ),
+        data: JSON.stringify(request),
+      };
+      const response = await this.axiosInstance.request<GetCandleDataResponse>(config);
+      return response.data;
+    } catch (error: any) {
+      if (error.response) {
+        throw {
+          status: false,
+          message: error.response.data?.message || 'Failed to fetch candle data',
+          errorcode: error.response.data?.errorcode || 'UNKNOWN_ERROR',
+          data: error.response.data?.data,
+        } as ApiErrorResponse;
+      }
+      throw {
+        status: false,
+        message: error.message || 'Network error',
+        errorcode: 'NETWORK_ERROR',
+      } as ApiErrorResponse;
+    }
+  }
+
+  /**
+   * Historical API: Get OI Data
+   * Returns historical open interest for F&O. Uses Historical API key. fromdate/todate format: "yyyy-MM-dd hh:mm"
+   */
+  async getOIData(
+    jwtToken: string,
+    request: GetOIDataRequest
+  ): Promise<GetOIDataResponse> {
+    try {
+      const config: AxiosRequestConfig = {
+        method: 'POST',
+        url: '/rest/secure/angelbroking/historical/v1/getOIData',
+        headers: this.getHeaders(
+          { Authorization: `Bearer ${jwtToken}` },
+          ApiType.HISTORICAL
+        ),
+        data: JSON.stringify(request),
+      };
+      const response = await this.axiosInstance.request<GetOIDataResponse>(config);
+      return response.data;
+    } catch (error: any) {
+      if (error.response) {
+        throw {
+          status: false,
+          message: error.response.data?.message || 'Failed to fetch OI data',
           errorcode: error.response.data?.errorcode || 'UNKNOWN_ERROR',
           data: error.response.data?.data,
         } as ApiErrorResponse;

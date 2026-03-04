@@ -560,6 +560,24 @@ export async function getTradeBookApi(): Promise<{
 }
 
 /**
+ * POST /api/market-data/stream/start – start Angel One Smart Stream (real-time LTP)
+ * Call after login to enable live prices without env vars on the server.
+ */
+export async function startMarketDataStream(credentials: {
+  jwtToken: string
+  feedToken: string
+  clientCode: string
+}): Promise<{ status: boolean; message?: string }> {
+  const response = await fetch(`${API_BASE_URL}/api/market-data/stream/start`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify(credentials),
+  })
+  const data = await response.json().catch(() => ({}))
+  return { status: !!data.status, message: data.message }
+}
+
+/**
  * POST /api/market-data/oi-buildup – long/short buildup, short covering, long unwinding
  */
 export async function getOIBuildupApi(body: {

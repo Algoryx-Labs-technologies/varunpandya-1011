@@ -503,6 +503,126 @@ export interface OptionGreekResponse {
   data: OptionGreekItem[];
 }
 
+// --- Instruments / Scrip Master / Intraday / Cautionary / Search Scrip ---
+
+/** Single row from OpenAPIScripMaster.json */
+export interface ScripMasterItem {
+  token: string;
+  symbol: string;
+  name: string;
+  expiry: string;
+  strike: string;
+  lotsize: string;
+  instrumenttype: string;
+  exch_seg: string;
+  tick_size: string;
+}
+
+export interface IntradayScripItem {
+  Exchange: string;
+  SymbolName: string;
+  Multiplier: string;
+}
+
+export interface NseIntradayResponse {
+  status: boolean;
+  message: string;
+  errorcode: string;
+  data: IntradayScripItem[];
+}
+
+export interface BseIntradayResponse {
+  status: boolean;
+  message: string;
+  errorcode: string;
+  data: IntradayScripItem[];
+}
+
+export interface CautionaryScripItem {
+  token: string;
+  symbol: string;
+  message: string;
+}
+
+export interface CautionaryScripsResponse {
+  status: boolean;
+  message: string;
+  errorcode: string;
+  data: CautionaryScripItem[];
+}
+
+export interface SearchScripRequest {
+  exchange: string;
+  searchscrip: string;
+}
+
+export interface SearchScripItem {
+  exchange: string;
+  tradingsymbol: string;
+  symboltoken: string;
+}
+
+export interface SearchScripResponse {
+  status: boolean;
+  message: string;
+  errorcode: string;
+  data: SearchScripItem[];
+}
+
+// --- Historical API ---
+
+/** Exchange for historical data: NSE | NFO | BSE | BFO | CDS | MCX */
+export type HistoricalExchange = 'NSE' | 'NFO' | 'BSE' | 'BFO' | 'CDS' | 'MCX';
+
+/** Interval for historical candle/OI data */
+export type HistoricalInterval =
+  | 'ONE_MINUTE'
+  | 'THREE_MINUTE'
+  | 'FIVE_MINUTE'
+  | 'TEN_MINUTE'
+  | 'FIFTEEN_MINUTE'
+  | 'THIRTY_MINUTE'
+  | 'ONE_HOUR'
+  | 'ONE_DAY';
+
+export interface GetCandleDataRequest {
+  exchange: HistoricalExchange;
+  symboltoken: string;
+  interval: HistoricalInterval;
+  fromdate: string; // "yyyy-MM-dd hh:mm"
+  todate: string;
+}
+
+/** Each row: [timestamp, open, high, low, close, volume] */
+export type CandleDataRow = [string, number, number, number, number, number];
+
+export interface GetCandleDataResponse {
+  status: boolean;
+  message: string;
+  errorcode: string;
+  data: CandleDataRow[];
+}
+
+export interface GetOIDataRequest {
+  exchange: HistoricalExchange;
+  symboltoken: string;
+  interval: HistoricalInterval;
+  fromdate: string;
+  todate: string;
+}
+
+export interface OIDataRow {
+  time: string;
+  oi: number;
+}
+
+export interface GetOIDataResponse {
+  status: boolean;
+  message: string;
+  errorcode: string;
+  data: OIDataRow[];
+}
+
 // --- Order APIs ---
 
 /** Order variety: NORMAL | STOPLOSS | ROBO */

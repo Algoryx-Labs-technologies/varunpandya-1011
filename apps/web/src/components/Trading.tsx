@@ -1,14 +1,18 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { getCurrentNiftyPrice } from '../data/optionChain'
 import { getPosition, getAllHolding } from '../data/dashboard'
 import { getLogsData } from '../data/logs'
 import { initTradingViewChart } from '../lib/tradingView'
+import { useWebSocket } from '../hooks/useWebSocket'
 import type { PositionItem, HoldingItem } from '../types/dashboard'
 
 export default function Trading() {
   const [terminalTime, setTerminalTime] = useState('')
   const [_niftyPrice] = useState(() => getCurrentNiftyPrice().toLocaleString('en-IN'))
   const [holdings, setHoldings] = useState<HoldingItem[]>([])
+  const { data: wsData } = useWebSocket()
+  const realTimeLtp = wsData?.realTimeLtp ?? {}
+  const indexTicks = useMemo(() => Object.entries(realTimeLtp).filter(([, v]) => v.symbol), [realTimeLtp])
   const [holdingsLoading, setHoldingsLoading] = useState(true)
   const [holdingsError, setHoldingsError] = useState(false)
   const [positionsNet, setPositionsNet] = useState<PositionItem[]>([])
@@ -108,21 +112,26 @@ export default function Trading() {
           </div>
         </div>
         <div className="terminal-indices-row">
-          <span className="terminal-index-item">
-            <strong>BANKNIFTY</strong> 55,481.85 334.25 (0.61%) <span className="terminal-arrow positive">▲</span>
-          </span>
-          <span className="terminal-index-item">
-            <strong>MIDCPNIFTY</strong> 13,151.10 4.55 (0.03%) <span className="terminal-arrow positive">▲</span>
-          </span>
-          <span className="terminal-index-item">
-            <strong>FINNIFTY</strong> 26,555.10 59.80 (0.23%) <span className="terminal-arrow positive">▲</span>
-          </span>
-          <span className="terminal-index-item">
-            <strong>BANKEX</strong> 62,429.63 467.75 (0.75%) <span className="terminal-arrow positive">▲</span>
-          </span>
-          <span className="terminal-index-item">
-            <strong>NIFTY NEXT 50</strong> 69,146.60 145.×
-          </span>
+          {indexTicks.length > 0 ? (
+            indexTicks.map(([token, { ltp, symbol }]) => (
+              <span key={token} className="terminal-index-item">
+                <strong>{symbol ?? token}</strong>{' '}
+                {typeof ltp === 'number' ? ltp.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}
+              </span>
+            ))
+          ) : (
+            <>
+              <span className="terminal-index-item">
+                <strong>BANKNIFTY</strong> — <span className="terminal-arrow positive">Live</span>
+              </span>
+              <span className="terminal-index-item">
+                <strong>NIFTY 50</strong> — <span className="terminal-arrow positive">Live</span>
+              </span>
+              <span className="terminal-index-item" style={{ color: 'var(--text-secondary)' }}>
+                Connect to backend for real-time prices
+              </span>
+            </>
+          )}
         </div>
       </div>
 
@@ -232,15 +241,21 @@ export default function Trading() {
                   </thead>
                   <tbody>
                     {holdings.map((h, i) => {
-                      const pnlClass = h.profitandloss >= 0 ? 'positive' : 'negative'
+                      const liveLtp = realTimeLtp[h.symboltoken]?.ltp ?? h.ltp
+                      const pnl = (liveLtp - h.averageprice) * h.quantity
+                      const pnlPct = h.averageprice ? ((liveLtp - h.averageprice) / h.averageprice) * 100 : 0
+                      const pnlClass = pnl >= 0 ? 'positive' : 'negative'
                       return (
                         <tr key={i} className="market-data-tr">
                           <td className="market-data-td">{h.tradingsymbol}</td>
                           <td className="market-data-td">{h.quantity}</td>
                           <td className="market-data-td">₹{h.averageprice.toFixed(2)}</td>
-                          <td className="market-data-td">₹{h.ltp.toFixed(2)}</td>
-                          <td className={`market-data-td ${pnlClass}`}>₹{h.profitandloss.toFixed(2)}</td>
-                          <td className={`market-data-td ${pnlClass}`}>{h.pnlpercentage.toFixed(2)}%</td>
+                          <td className="market-data-td">
+                            ₹{liveLtp.toFixed(2)}
+                            {realTimeLtp[h.symboltoken] && <span className="terminal-live-dot" title="Live" />}
+                          </td>
+                          <td className={`market-data-td ${pnlClass}`}>₹{pnl.toFixed(2)}</td>
+                          <td className={`market-data-td ${pnlClass}`}>{pnlPct.toFixed(2)}%</td>
                         </tr>
                       )
                     })}

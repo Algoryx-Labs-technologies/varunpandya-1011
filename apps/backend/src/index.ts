@@ -10,6 +10,7 @@ import { createServer, Server } from 'http';
 import dotenv from 'dotenv';
 import tradingRoutes from './routes/trading.js';
 import { setupWebSocket } from './websocket/index.js';
+import { startSmartStreamFromEnv } from './websocket/smartStreamClient.js';
 
 dotenv.config();
 
@@ -208,6 +209,7 @@ async function start(): Promise<void> {
     console.log(`🚀 Trading Backend API running on http://localhost:${PORT}`);
     console.log(`📊 WebSocket: ws://localhost:${PORT}/ws`);
     setupWebSocket(httpServer);
+    startSmartStreamFromEnv();
     if (setupWebSocketServer) {
       setupWebSocketServer(httpServer);
       console.log(`🔌 Order WebSocket: ws://localhost:${PORT}/api/order/websocket`);

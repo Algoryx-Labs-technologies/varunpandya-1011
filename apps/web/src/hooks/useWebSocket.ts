@@ -41,6 +41,8 @@ export interface VertexWsData {
   patternDetections?: Array<{ id?: string; pattern?: string; type?: string; signal?: string; index?: string; timeframe?: string; timestamp?: string; level_type?: string; level_price?: number; current_price?: number }>
   missedTrades?: Array<{ direction?: string; level_type?: string; potential_pnl?: number; rr_ratio?: number; reason?: string }>
   statistics?: { totalTrades?: number; winRate?: number; totalPnl?: number; winningTrades?: number; losingTrades?: number; profitFactor?: number; avgWin?: number; avgLoss?: number }
+  /** Real-time LTP by token (Angel One Smart Stream). Key = token string. */
+  realTimeLtp?: Record<string, { ltp: number; symbol?: string; exchangeType?: number }>
 }
 
 export function useWebSocket(): { connected: boolean; data: VertexWsData | null } {
@@ -114,6 +116,13 @@ export function useWebSocket(): { connected: boolean; data: VertexWsData | null 
                 const oc = message.data
                 if (oc && oc.index) {
                   newData.optionChain = { ...prev?.optionChain, [oc.index]: oc }
+                }
+                break
+              }
+              case 'ltp': {
+                const tick = message.data
+                if (tick && tick.token != null && typeof tick.ltp === 'number') {
+                  newData.realTimeLtp = { ...prev?.realTimeLtp, [String(tick.token)]: { ltp: tick.ltp, symbol: tick.symbol, exchangeType: tick.exchangeType } }
                 }
                 break
               }
