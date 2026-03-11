@@ -34,3 +34,32 @@ class TestLevelManager:
         ed_levels = lm.get_levels_by_type("5m", "ED")
         assert len(ed_levels) == 1
         assert ed_levels[0].price == 24100.0
+
+    def test_compute_auto_levels_returns_list(self, real_ohlc_df):
+        """LevelManager.compute_auto_levels returns a list of Level (manual + pivot/KMeans/ATR/BB/SAR + optional ML). Uses real historical OHLC when available."""
+        lm = LevelManager(use_ai=False)
+        levels = lm.compute_auto_levels(real_ohlc_df, "5m", num_levels=20)
+        assert isinstance(levels, list)
+        assert len(levels) >= 1
+        for lev in levels:
+            assert hasattr(lev, "price") and hasattr(lev, "level_type") and hasattr(lev, "timeframe")
+
+    def test_get_levels_merges_manual_and_auto(self, real_ohlc_df):
+        """get_levels(timeframe) returns manual + auto levels combined and sorted by price. Uses real historical OHLC when available."""
+        lm = LevelManager(use_ai=False)
+        lm.add_manual_level(24100.0, "ED", "5m")
+        lm.compute_auto_levels(real_ohlc_df, "5m", num_levels=5)
+        all_levels = lm.get_levels("5m")
+        assert len(all_levels) >= 2
+        prices = [l.price for l in all_levels]
+        assert prices == sorted(prices)
+        # Manual ED @ 24100 must be present among levels
+        assert any(l.price == 24100.0 and l.level_type == "ED" for l in all_levels)
+
+    def test_add_manual_level_invalid_rejected(self):
+        """Invalid price or level_type is rejected."""
+        lm = LevelManager()
+        assert lm.add_manual_level(0, "ED", "5m") is False
+        assert lm.add_manual_level(-100, "ED", "5m") is False
+        assert lm.add_manual_level(24100, "INVALID", "5m") is False
+        assert lm.add_manual_level(24100, "ED", "5m") is True

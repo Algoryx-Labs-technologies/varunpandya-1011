@@ -12,6 +12,10 @@ from loguru import logger
 import json
 from datetime import datetime
 from config import Config
+try:
+    from utils.logging_config import step_log as _step
+except ImportError:
+    def _step(m, s, d="", **k): logger.info(f"[{m}] {s} | {d}" + (" | " + str(k) if k else ""))
 
 
 def _totp_code(secret: str) -> str:
@@ -73,7 +77,8 @@ class AngelOneBroker:
                     if not self.refresh_token:
                         logger.warning("Login response missing refreshToken; getProfile/token refresh may fail")
                     mode = "PAPER" if getattr(Config, "PAPER_TRADING", True) else "LIVE"
-                    logger.info("Angel One connected (mode=%s)", mode)
+                    logger.info(f"Angel One connected (mode={mode})")
+                    _step("broker", "connect", "OK", mode=mode)
                     return True
                 msg = data.get("message") or "Unknown error"
                 errcode = data.get("errorcode") or ""
@@ -88,7 +93,7 @@ class AngelOneBroker:
             return False
         except Exception as e:
             self.last_error = (str(e), "")
-            logger.error("Angel One connect error: %s", e)
+            logger.exception("Angel One connect error: %s", e)
             return False
 
     def renew_token(self) -> bool:
@@ -139,6 +144,9 @@ class AngelOneBroker:
             price: Limit price
             order_type: Order type (LIMIT/MARKET)
         """
+        if not self.obj:
+            logger.error("place_buy_order: broker not connected")
+            return None
         try:
             order_params = {
                 "variety": Config.VARIETY,
@@ -181,6 +189,9 @@ class AngelOneBroker:
             price: Limit price
             order_type: Order type (LIMIT/MARKET)
         """
+        if not self.obj:
+            logger.error("place_sell_order: broker not connected")
+            return None
         try:
             order_params = {
                 "variety": Config.VARIETY,
@@ -261,15 +272,24 @@ class AngelOneBroker:
             logger.error(f"Error getting tradebook: {str(e)}")
             return []
     
-    def get_ltp(self, exchange: str, symbol_token: str) -> Optional[float]:
-        """Get Last Traded Price (LTP)"""
+    def get_ltp(self, exchange: str, symbol_token: str, tradingsymbol: Optional[str] = None) -> Optional[float]:
+        """Get Last Traded Price (LTP). SmartAPI requires exchange, tradingsymbol, symboltoken."""
         try:
-            response = self.obj.ltpData(exchange, symbol_token)
+            ts = (tradingsymbol or "").strip() or str(symbol_token)
+            logger.debug("[broker] get_ltp request exchange=%s symboltoken=%s tradingsymbol=%s", exchange, symbol_token, ts)
+            _step("broker", "get_ltp", "request", exchange=exchange, symboltoken=symbol_token, tradingsymbol=ts)
+            response = self.obj.ltpData(exchange, ts, str(symbol_token))
             if response and response.get('status'):
-                return float(response['data']['ltp'])
+                ltp = float(response['data']['ltp'])
+                logger.debug("[broker] get_ltp OK ltp=%s", ltp)
+                _step("broker", "get_ltp", "OK", ltp=ltp)
+                return ltp
+            logger.debug("[broker] get_ltp no data in response status=%s", response.get('status') if response else None)
+            _step("broker", "get_ltp", "no data")
             return None
         except Exception as e:
-            logger.error(f"Error getting LTP: {str(e)}")
+            logger.exception("Error getting LTP: %s", e)
+            _step("broker", "get_ltp", "error", error=str(e))
             return None
     
     def get_historical_data(
@@ -278,7 +298,8 @@ class AngelOneBroker:
         exchange: str,
         interval: str,
         from_date: str,
-        to_date: str
+        to_date: str,
+        tradingsymbol: Optional[str] = None,
     ) -> Optional[List[Dict]]:
         """
         Get historical OHLC data
@@ -289,21 +310,29 @@ class AngelOneBroker:
             interval: Timeframe (ONE_MINUTE, FIVE_MINUTE, FIFTEEN_MINUTE)
             from_date: Start date (YYYY-MM-DD HH:mm:ss)
             to_date: End date (YYYY-MM-DD HH:mm:ss)
+            tradingsymbol: Optional; required for some indices (e.g. Nifty 50)
         """
         try:
-            response = self.obj.getCandleData({
+            params = {
                 "exchange": exchange,
                 "symboltoken": token,
                 "interval": interval,
                 "fromdate": from_date,
-                "todate": to_date
-            })
-            
+                "todate": to_date,
+            }
+            if tradingsymbol:
+                params["tradingsymbol"] = tradingsymbol
+            _step("broker", "get_historical_data", "request", token=token, interval=interval, fromdate=from_date, todate=to_date)
+            response = self.obj.getCandleData(params)
             if response and response.get('status'):
-                return response.get('data', [])
+                data = response.get('data', [])
+                _step("broker", "get_historical_data", "OK", rows=len(data))
+                return data
+            _step("broker", "get_historical_data", "no data")
             return []
         except Exception as e:
-            logger.error(f"Error getting historical data: {str(e)}")
+            logger.exception("Error getting historical data: %s", e)
+            _step("broker", "get_historical_data", "error", error=str(e))
             return None
     
     def cancel_all(self) -> int:
@@ -347,7 +376,7 @@ class AngelOneBroker:
                 quantity = int(position.get("netqty", 0))
                 if quantity == 0:
                     continue
-                ltp = self.get_ltp(exchange, str(token)) if token else None
+                ltp = self.get_ltp(exchange, str(token), position.get("tradingsymbol")) if token else None
                 if ltp is None or float(ltp) <= 0:
                     logger.warning(f"squareoff: no LTP for {symbol}, skip")
                     continue

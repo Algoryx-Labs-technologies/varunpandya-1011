@@ -123,9 +123,16 @@ router.post('/option-chain', (req, res) => {
   }
 });
 
-router.get('/option-chain', (req, res) => {
+router.get('/option-chain', async (req, res) => {
   const index = (req.query.index || 'NIFTY').toUpperCase();
-  const data = tradingStore.getOptionChain(index);
+  let data = tradingStore.getOptionChain(index);
+  if (!data) {
+    try {
+      data = await persistence.loadLatestOptionSnapshot(index);
+    } catch {
+      data = null;
+    }
+  }
   res.json({ status: 'success', data: data || null });
 });
 

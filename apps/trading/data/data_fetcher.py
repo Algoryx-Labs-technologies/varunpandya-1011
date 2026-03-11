@@ -14,6 +14,7 @@ import requests
 from loguru import logger
 from broker.angel_one import AngelOneBroker
 from config import Config
+from .historical_storage import save_index_ohlc
 
 # Optional: use central alert for repeated failures
 try:
@@ -22,6 +23,10 @@ except ImportError:
     def log_module(m, a, msg, **k): logger.info(f"[{m}] {a}: {msg}")
     def alert(sev, msg, payload=None): logger.warning(f"[ALERT] {msg}")
     ALERT_WARNING = "warning"
+try:
+    from utils.logging_config import step_log as _step
+except ImportError:
+    def _step(m, s, d="", **k): logger.info(f"[{m}] {s} | {d}")
 
 VALID_INDICES = frozenset(getattr(Config, "INDEX_SYMBOLS", {}).keys() or {"NIFTY", "BANKNIFTY", "FINNIFTY"})
 VALID_TIMEFRAMES = frozenset(getattr(Config, "TIMEFRAMES", []) or ["1m", "5m", "15m"])
@@ -67,6 +72,18 @@ class DataFetcher:
             "FINNIFTY": "99926037",
         }
         return tokens.get(index)
+
+    def get_index_tradingsymbol(self, index: str) -> Optional[str]:
+        """Angel One tradingsymbol for LTP/historical (NSE index symbols)."""
+        if not index or not isinstance(index, str):
+            return None
+        index = index.strip().upper()
+        symbols = {
+            "NIFTY": "Nifty 50",
+            "BANKNIFTY": "Nifty Bank",
+            "FINNIFTY": "Fin Nifty",
+        }
+        return symbols.get(index)
     
     def fetch_ohlc_data(
         self,
@@ -100,12 +117,16 @@ class DataFetcher:
             from_str = from_date.strftime("%Y-%m-%d %H:%M")
             to_str = to_date.strftime("%Y-%m-%d %H:%M")
 
+            logger.debug("[data] fetch_ohlc request index=%s timeframe=%s days_back=%s from=%s to=%s", index, timeframe, days_back, from_str, to_str)
+            _step("data", "fetch_ohlc", "request", index=index, timeframe=timeframe, days_back=days_back)
+            tradingsymbol = self.get_index_tradingsymbol(index)
             data = self.broker.get_historical_data(
                 token=token,
                 exchange=Config.EXCHANGE,
                 interval=interval_map.get(timeframe, "ONE_MINUTE"),
                 from_date=from_str,
                 to_date=to_str,
+                tradingsymbol=tradingsymbol,
             )
 
             if not data:
@@ -117,7 +138,8 @@ class DataFetcher:
                 logger.warning(f"fetch_ohlc_data: empty or invalid columns for {index} {timeframe}")
                 return None
             df.columns = ["timestamp", "open", "high", "low", "close", "volume"]
-            df["timestamp"] = pd.to_datetime(df["timestamp"], format="%Y-%m-%dT%H:%M:%S", errors="coerce")
+            # Angel One returns e.g. 2023-11-16T09:15:00+05:30; use errors=coerce to accept timezone
+            df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True, errors="coerce")
             df = df.dropna(subset=["timestamp"])
             if df.empty:
                 return None
@@ -126,11 +148,19 @@ class DataFetcher:
             df = df.dropna(subset=["open", "high", "low", "close"])
             df.set_index("timestamp", inplace=True)
             df = df.sort_index()
+            if len(df) > 0:
+                logger.debug("[data] fetch_ohlc OK rows=%s first_ts=%s last_ts=%s", len(df), df.index[0], df.index[-1])
             log_module("data_fetcher", "fetch_ohlc", f"Fetched {len(df)} candles", index=index, timeframe=timeframe, rows=len(df))
+            _step("data", "fetch_ohlc", "OK", index=index, timeframe=timeframe, rows=len(df))
+            try:
+                save_index_ohlc(index, timeframe, df)
+                _step("data", "fetch_ohlc", "saved to historical", index=index, timeframe=timeframe)
+            except Exception as _e:
+                pass
             return df
 
         except Exception as e:
-            logger.exception(f"fetch_ohlc_data failed: {e}")
+            logger.exception("fetch_ohlc_data failed: %s", e)
             return None
     
     def fetch_option_chain(self, index: str) -> Optional[Dict]:
@@ -142,7 +172,8 @@ class DataFetcher:
         if index not in VALID_INDICES:
             logger.warning(f"fetch_option_chain: invalid index '{index}'")
             return None
-
+        logger.debug("[data] fetch_option_chain request NSE index=%s url=option-chain-indices", index)
+        _step("data", "fetch_option_chain", "request NSE", index=index)
         url = f"https://www.nseindia.com/api/option-chain-indices?symbol={index}"
         session = requests.Session()
         session.headers.update(self.nse_headers)
@@ -151,6 +182,7 @@ class DataFetcher:
             try:
                 session.get("https://www.nseindia.com/", timeout=self.timeout)
                 response = session.get(url, timeout=self.timeout)
+                logger.debug("[data] fetch_option_chain NSE response status=%s len=%s", response.status_code, len(response.content) if response.content else 0)
                 response.raise_for_status()
                 data = response.json()
                 break
@@ -162,6 +194,14 @@ class DataFetcher:
         else:
             log_module("data_fetcher", "fetch_option_chain", f"Failed after {self.nse_retries + 1} attempts", index=index, error=str(last_error))
             alert(ALERT_WARNING, "NSE option chain fetch failed", {"index": index, "error": str(last_error)})
+            try:
+                from .historical_storage import load_latest_option_snapshot
+                fallback = load_latest_option_snapshot(index)
+                if fallback:
+                    _step("data", "fetch_option_chain", "fallback from historical (NSE failed)", index=index)
+                    return fallback
+            except Exception:
+                pass
             return None
 
         try:
@@ -169,6 +209,14 @@ class DataFetcher:
             option_data = records.get("data") or []
             if not option_data:
                 logger.warning(f"fetch_option_chain: empty data for {index}")
+                try:
+                    from .historical_storage import load_latest_option_snapshot
+                    fallback = load_latest_option_snapshot(index)
+                    if fallback:
+                        _step("data", "fetch_option_chain", "fallback from historical", index=index)
+                        return fallback
+                except Exception:
+                    pass
                 return None
 
             def _num(v, default=0):
@@ -207,18 +255,35 @@ class DataFetcher:
             underlying = _num(records.get("underlyingValue"), 0)
             if underlying <= 0:
                 logger.warning(f"fetch_option_chain: invalid underlying_value for {index}")
+                underlying = 0.0
+
+            # Ensure required columns exist for real-time trading (avoid KeyError in main/position_sizer)
+            cols = ["strike", "ltp", "oi", "volume", "bid", "ask", "symbol"]
+            calls_df = pd.DataFrame(calls) if calls else pd.DataFrame(columns=cols)
+            puts_df = pd.DataFrame(puts) if puts else pd.DataFrame(columns=cols)
+            for c in cols:
+                if c not in calls_df.columns:
+                    calls_df[c] = 0.0 if c != "symbol" else ""
+                if c not in puts_df.columns:
+                    puts_df[c] = 0.0 if c != "symbol" else ""
+            # Drop rows with invalid strike (NaN or <=0) so select_strike_from_option_chain does not break
+            if not calls_df.empty and "strike" in calls_df.columns:
+                calls_df = calls_df[pd.to_numeric(calls_df["strike"], errors="coerce").fillna(0) > 0]
+            if not puts_df.empty and "strike" in puts_df.columns:
+                puts_df = puts_df[pd.to_numeric(puts_df["strike"], errors="coerce").fillna(0) > 0]
 
             result = {
                 "index": index,
                 "timestamp": datetime.now().isoformat(),
-                "calls": pd.DataFrame(calls) if calls else pd.DataFrame(columns=["strike", "ltp", "oi", "volume", "bid", "ask", "symbol"]),
-                "puts": pd.DataFrame(puts) if puts else pd.DataFrame(columns=["strike", "ltp", "oi", "volume", "bid", "ask", "symbol"]),
+                "calls": calls_df,
+                "puts": puts_df,
                 "underlying_value": underlying,
             }
-            log_module("data_fetcher", "fetch_option_chain", f"OK calls={len(calls)} puts={len(puts)}", index=index)
+            log_module("data_fetcher", "fetch_option_chain", f"OK calls={len(calls_df)} puts={len(puts_df)}", index=index)
+            _step("data", "fetch_option_chain", "OK", index=index, calls=len(calls_df), puts=len(puts_df), underlying=underlying)
             return result
         except Exception as e:
-            logger.exception(f"fetch_option_chain parse error: {e}")
+            logger.exception("fetch_option_chain parse error: %s", e)
             return None
     
     def get_current_price(self, index: str) -> Optional[float]:
@@ -227,19 +292,39 @@ class DataFetcher:
             index = (index or "").strip().upper()
             if index not in VALID_INDICES:
                 return None
+            logger.debug("[data] get_current_price request index=%s", index)
+            _step("data", "get_current_price", "request", index=index)
             token = self.get_index_token(index)
+            tradingsymbol = self.get_index_tradingsymbol(index)
             if token:
-                price = self.broker.get_ltp(Config.EXCHANGE, token)
+                try:
+                    from broker.feed_websocket import get_ltp_from_feed
+                    price = get_ltp_from_feed(token)
+                    if price is not None and price > 0:
+                        logger.debug("[data] get_current_price source=WebSocket feed price=%s", price)
+                        _step("data", "get_current_price", "OK from WebSocket feed", index=index, price=price)
+                        return float(price)
+                except Exception as feed_err:
+                    logger.debug("[data] get_current_price WebSocket feed skip: %s", feed_err)
+                price = self.broker.get_ltp(Config.EXCHANGE, token, tradingsymbol)
                 if price is not None and not (isinstance(price, float) and math.isnan(price)) and price > 0:
+                    logger.debug("[data] get_current_price source=broker LTP price=%s", price)
+                    _step("data", "get_current_price", "OK from broker LTP", index=index, price=price)
                     return float(price)
+            logger.debug("[data] get_current_price trying option chain underlying")
             chain = self.fetch_option_chain(index)
             if chain:
                 uv = chain.get("underlying_value")
                 if uv is not None and uv > 0:
+                    logger.debug("[data] get_current_price source=option_chain underlying value=%s", uv)
+                    _step("data", "get_current_price", "OK from option chain underlying", index=index, underlying=uv)
                     return float(uv)
+            logger.debug("[data] get_current_price no price available for index=%s", index)
+            _step("data", "get_current_price", "no price", index=index)
             return None
         except Exception as e:
-            logger.error(f"get_current_price: {e}")
+            logger.exception("get_current_price failed: %s", e)
+            _step("data", "get_current_price", "error", index=index, error=str(e))
             return None
     
     def get_atm_strikes(self, index: str, num_strikes: int = 5) -> List[float]:

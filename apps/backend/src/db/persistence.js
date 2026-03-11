@@ -56,6 +56,30 @@ export async function saveOptionSnapshot(indexName, payload) {
   }
 }
 
+export async function loadLatestOptionSnapshot(indexName) {
+  const database = await getDb();
+  if (!database) return null;
+  try {
+    const row = database.prepare(`
+      SELECT timestamp, underlying_value, calls_json, puts_json
+      FROM option_snapshots WHERE index_name = ?
+      ORDER BY timestamp DESC LIMIT 1
+    `).get(indexName);
+    if (!row) return null;
+    const calls = row.calls_json ? (() => { try { return JSON.parse(row.calls_json); } catch { return []; } })() : [];
+    const puts = row.puts_json ? (() => { try { return JSON.parse(row.puts_json); } catch { return []; } })() : [];
+    return {
+      index: indexName,
+      timestamp: row.timestamp,
+      underlying_value: row.underlying_value,
+      calls,
+      puts,
+    };
+  } catch (e) {
+    return null;
+  }
+}
+
 export async function loadCandlesFromDb(indexName, timeframe, limit = 500) {
   const database = await getDb();
   if (!database) return [];

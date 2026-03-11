@@ -101,13 +101,20 @@ class BackendAPI:
             return None
 
     def health_check(self) -> bool:
+        """Return True if backend responds with 200. Handles timeout and connection errors."""
         if not self.base_url:
             return False
         try:
             r = self.session.get(f"{self.base_url}/health", timeout=TIMEOUT)
             return r.status_code == 200
+        except requests.exceptions.Timeout:
+            logger.debug("Backend health check timeout")
+            return False
+        except requests.exceptions.RequestException as e:
+            logger.debug("Backend health check failed: %s", e)
+            return False
         except Exception as e:
-            logger.debug(f"Backend health check failed: {e}")
+            logger.debug("Backend health check failed: %s", e)
             return False
 
     def send_pattern_detection(self, payload: Dict) -> bool:

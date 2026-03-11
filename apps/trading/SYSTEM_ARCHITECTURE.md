@@ -208,6 +208,10 @@ Frontend (React)
 - `main.py` - Main orchestrator
 - `config.py` - Configuration (from .env only)
 
+## Testing (real historical data)
+
+Tests run on **real historical OHLC** that has been fetched and saved under `data/historical/index_ohlc/`. Run `python tests/run_e2e_with_logs.py` once to fetch and save data; then `pytest tests/ -v` uses this data for indicators, levels, patterns, ML, and E2E flow tests. When no historical data exists, tests fall back to synthetic dummy data or skip (see `tests/README.md` and `conftest.py` fixtures `historical_ohlc_df`, `real_ohlc_df`).
+
 ## Performance Requirements
 
 - ✅ Fully vectorized logic (pandas/numpy)

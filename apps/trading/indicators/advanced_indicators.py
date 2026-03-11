@@ -353,9 +353,15 @@ class AdvancedIndicators:
     @staticmethod
     def compute_all_indicators(df: Optional[pd.DataFrame]) -> pd.DataFrame:
         """Compute all indicators and merge into one DataFrame. Preserves original OHLCV."""
+        try:
+            from utils.logging_config import step_log as _step
+        except ImportError:
+            _step = lambda m, s, d="", **k: logger.info(f"[{m}] {s} | {d}")
         df = _ensure_ohlc(df)
         if df is None:
+            logger.debug("[indicators] compute_all_indicators: no OHLC or empty")
             return pd.DataFrame()
+        logger.debug("[indicators] compute_all_indicators start rows=%s", len(df))
         result = df.copy()
         for name, method in [
             ("atr_bands", lambda: AdvancedIndicators.atr_bands(result)),
@@ -379,5 +385,6 @@ class AdvancedIndicators:
                     for col in out.columns:
                         result[col] = out[col]
             except Exception as e:
-                logger.debug(f"compute_all {name}: {e}")
+                logger.debug("compute_all %s: %s", name, e)
+        _step("indicators", "compute_all_indicators", "done", rows=len(result), cols=len(result.columns))
         return result

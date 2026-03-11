@@ -20,6 +20,10 @@ import numpy as np
 from typing import List, Dict, Optional
 from loguru import logger
 from config import Config
+try:
+    from utils.logging_config import step_log as _step
+except ImportError:
+    def _step(m, s, d="", **k): logger.info(f"[{m}] {s} | {d}")
 
 try:
     import talib
@@ -84,8 +88,10 @@ class CandlestickPatternDetector:
             DataFrame with pattern detection columns added
         """
         if len(df) < 3:
+            logger.debug("[patterns] detect_patterns skip rows=%s (< 3)", len(df))
             return df
-        
+        _step("patterns", "detect_patterns", "start", rows=len(df))
+        logger.debug("[patterns] detect_patterns start rows=%s", len(df))
         df = df.copy()
         open_prices = df['open'].values
         high_prices = df['high'].values
@@ -113,18 +119,20 @@ class CandlestickPatternDetector:
         # Create summary columns
         df['bullish_pattern'] = self._has_bullish_pattern(df)
         df['bearish_pattern'] = self._has_bearish_pattern(df)
-        
+        pattern_cols = [c for c in df.columns if c.startswith("pattern_")]
+        logger.debug("[patterns] detect_patterns done rows=%s pattern_columns=%s", len(df), len(pattern_cols))
+        _step("patterns", "detect_patterns", "done", rows=len(df), pattern_cols=len(pattern_cols))
         return df
     
     def _apply_custom_filters(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Apply custom filters to pattern detection"""
+        """Apply custom filters to pattern detection. Handles zero open/high-low to avoid division errors."""
         df = df.copy()
-        
-        # Calculate body size and wick ratios
-        df['body_size'] = abs(df['close'] - df['open']) / df['open']
+        open_safe = df['open'].replace(0, np.nan).fillna(1e-10)
+        df['body_size'] = abs(df['close'] - df['open']) / open_safe
         df['upper_wick'] = df['high'] - df[['open', 'close']].max(axis=1)
         df['lower_wick'] = df[['open', 'close']].min(axis=1) - df['low']
-        df['wick_ratio'] = (df['upper_wick'] + df['lower_wick']) / (df['high'] - df['low'] + 1e-10)
+        range_safe = (df['high'] - df['low']).replace(0, np.nan).fillna(1e-10)
+        df['wick_ratio'] = (df['upper_wick'] + df['lower_wick']) / range_safe
         
         # Filter patterns based on body size (min and optional max for OHLC specificity)
         for col in df.columns:
@@ -211,7 +219,7 @@ class CandlestickPatternDetector:
         """
         if len(df) < 2:
             return None
-        
+        _step("patterns", "check_level_break", "check", level_price=level_price, level_type=level_type)
         latest = df.iloc[-1]
         prev = df.iloc[-2]
         current_price = latest['close']
@@ -247,6 +255,7 @@ class CandlestickPatternDetector:
         
         if level_broken:
             pattern_info = self.get_latest_pattern(df)
+            logger.debug("[patterns] check_level_break level_broken=True level_price=%s level_type=%s direction=%s pattern=%s", level_price, level_type, direction, pattern_info.get("pattern") if pattern_info else None)
             if pattern_info and pattern_info['type'] == direction:
                 return {
                     'signal': direction,

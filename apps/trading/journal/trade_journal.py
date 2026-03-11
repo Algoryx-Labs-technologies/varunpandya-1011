@@ -17,6 +17,10 @@ import pandas as pd
 from loguru import logger
 
 from config import Config
+try:
+    from utils.logging_config import step_log as _step
+except ImportError:
+    def _step(m, s, d="", **k): logger.info(f"[{m}] {s} | {d}")
 
 # Schema version for forward compatibility
 JOURNAL_SCHEMA_VERSION = "1.0"
@@ -116,6 +120,7 @@ class TradeJournal:
         self.trades.append(trade)
         self.save_trades()
         logger.info(f"Trade logged: {trade.trade_id} | P&L: {trade.pnl:.2f}")
+        _step("journal", "add_trade", "logged", trade_id=trade.trade_id, index=trade.index, pnl=trade.pnl)
 
     def save_trades(self) -> bool:
         """Persist journal to JSON. Ensures parent dir exists. Returns False on error."""
@@ -134,7 +139,7 @@ class TradeJournal:
             logger.error(f"Journal save failed (file/dir): {e}")
             return False
         except Exception as e:
-            logger.exception(f"Journal save failed: {e}")
+            logger.exception("Journal save failed: %s", e)
             return False
 
     def load_trades(self) -> None:
@@ -273,9 +278,10 @@ class TradeJournal:
                 df = df.drop(columns=["meta"], errors="ignore")
             df.to_csv(path, index=False, encoding="utf-8")
             logger.info(f"Trades exported to {path}")
+            _step("journal", "export_to_csv", "done", path=str(path), count=len(self.trades))
             return True
         except Exception as e:
-            logger.error(f"Export CSV failed: {e}")
+            logger.exception("Export CSV failed: %s", e)
             return False
 
     def export_to_excel(self, filepath: Optional[str] = None) -> bool:
@@ -291,7 +297,8 @@ class TradeJournal:
                 df = df.drop(columns=["meta"], errors="ignore")
             df.to_excel(path, index=False)
             logger.info(f"Trades exported to {path}")
+            _step("journal", "export_to_excel", "done", path=str(path), count=len(self.trades))
             return True
         except Exception as e:
-            logger.error(f"Export Excel failed: {e}")
+            logger.exception("Export Excel failed: %s", e)
             return False

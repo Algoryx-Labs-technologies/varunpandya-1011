@@ -1,0 +1,110 @@
+﻿============================= test session starts =============================
+platform win32 -- Python 3.11.0, pytest-9.0.2, pluggy-1.6.0 -- C:\Users\shiba\OneDrive\Desktop\varunpandya-1011-main\varunpandya-1011\apps\trading\venv\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Users\shiba\OneDrive\Desktop\varunpandya-1011-main\varunpandya-1011\apps\trading
+configfile: pytest.ini
+plugins: anyio-4.12.1
+collecting ... collected 85 items
+
+tests/test_all_folders.py::test_config_folder PASSED                     [  1%]
+tests/test_all_folders.py::test_broker_folder PASSED                     [  2%]
+tests/test_all_folders.py::test_broker_feed_websocket PASSED             [  3%]
+tests/test_all_folders.py::test_data_fetcher PASSED                      [  4%]
+tests/test_all_folders.py::test_data_historical_storage PASSED           [  5%]
+tests/test_all_folders.py::test_strategy_folder PASSED                   [  7%]
+tests/test_all_folders.py::test_patterns_folder PASSED                   [  8%]
+tests/test_all_folders.py::test_levels_folder PASSED                     [  9%]
+tests/test_all_folders.py::test_money_folder PASSED                      [ 10%]
+tests/test_all_folders.py::test_risk_folder PASSED                       [ 11%]
+tests/test_all_folders.py::test_journal_folder PASSED                    [ 12%]
+tests/test_all_folders.py::test_analytics_folder PASSED                  [ 14%]
+tests/test_all_folders.py::test_execution_folder PASSED                  [ 15%]
+tests/test_all_folders.py::test_api_folder PASSED                        [ 16%]
+tests/test_all_folders.py::test_indicators_folder PASSED                 [ 17%]
+tests/test_all_folders.py::test_intelligence_folder PASSED               [ 18%]
+tests/test_all_folders.py::test_utils_folder PASSED                      [ 20%]
+tests/test_all_folders.py::test_ai_folder PASSED                         [ 21%]
+tests/test_config.py::TestConfig::test_get_allocation PASSED             [ 22%]
+tests/test_config.py::TestConfig::test_lot_sizes PASSED                  [ 23%]
+tests/test_config.py::TestConfig::test_strike_preference PASSED          [ 24%]
+tests/test_config.py::TestConfig::test_key_secret_tuple PASSED           [ 25%]
+tests/test_data_dummy.py::TestDataFormats::test_ohlc_columns PASSED      [ 27%]
+tests/test_data_dummy.py::TestDataFormats::test_ohlc_index_datetime PASSED [ 28%]
+tests/test_data_dummy.py::TestDataFormats::test_option_chain_like_dict PASSED [ 29%]
+tests/test_e2e_data_flow.py::test_e2e_config PASSED                      [ 30%]
+tests/test_e2e_data_flow.py::test_e2e_tokens_and_tradingsymbols PASSED   [ 31%]
+tests/test_e2e_data_flow.py::test_e2e_broker_connect PASSED              [ 32%]
+tests/test_e2e_data_flow.py::test_e2e_data_flow_live SKIPPED (Broker
+connect failed (e.g. rate limit): Couldn't parse the JSON response
+received from the server: b'Access denied because of exceeding access
+rate')                                                                   [ 34%]
+tests/test_e2e_data_flow.py::test_e2e_levels_journal_ml_flow PASSED      [ 35%]
+tests/test_historical_data.py::TestIndicatorsOnHistorical::test_compute_all_indicators_on_historical PASSED [ 36%]
+tests/test_historical_data.py::TestIndicatorsOnHistorical::test_atr_and_bollinger_on_historical PASSED [ 37%]
+tests/test_historical_data.py::TestPatternsOnHistorical::test_detect_patterns_on_historical PASSED [ 38%]
+tests/test_historical_data.py::TestLevelsOnHistorical::test_compute_auto_levels_on_historical PASSED [ 40%]
+tests/test_historical_data.py::TestLevelsOnHistorical::test_ml_detect_levels_on_historical PASSED [ 41%]
+tests/test_historical_data.py::TestStrategyOnHistorical::test_generate_signals_on_historical PASSED [ 42%]
+tests/test_indicators.py::TestAdvancedIndicators::test_atr_bands PASSED  [ 43%]
+tests/test_indicators.py::TestAdvancedIndicators::test_bollinger_bands PASSED [ 44%]
+tests/test_indicators.py::TestAdvancedIndicators::test_pivot_points PASSED [ 45%]
+tests/test_indicators.py::TestAdvancedIndicators::test_vwap PASSED       [ 47%]
+tests/test_indicators.py::TestAdvancedIndicators::test_donchian_channel PASSED [ 48%]
+tests/test_journal.py::TestTradeJournal::test_add_trade PASSED           [ 49%]
+tests/test_journal.py::TestTradeJournal::test_get_statistics_empty PASSED [ 50%]
+tests/test_journal.py::TestTradeJournal::test_get_statistics_with_trade PASSED [ 51%]
+tests/test_journal.py::TestTradeJournal::test_export_csv PASSED          [ 52%]
+tests/test_journal.py::TestTradeJournal::test_saved_json_has_schema_version_and_trades PASSED [ 54%]
+tests/test_journal.py::TestTradeJournal::test_load_trades_from_json_file PASSED [ 55%]
+tests/test_journal.py::TestTradeJournal::test_add_trade_then_save_and_load_roundtrip PASSED [ 56%]
+tests/test_levels.py::TestLevelManager::test_add_manual_level PASSED     [ 57%]
+tests/test_levels.py::TestLevelManager::test_load_manual_levels_from_csv PASSED [ 58%]
+tests/test_levels.py::TestLevelManager::test_get_levels_by_type PASSED   [ 60%]
+tests/test_levels.py::TestLevelManager::test_compute_auto_levels_returns_list PASSED [ 61%]
+tests/test_levels.py::TestLevelManager::test_get_levels_merges_manual_and_auto PASSED [ 62%]
+tests/test_levels.py::TestLevelManager::test_add_manual_level_invalid_rejected PASSED [ 63%]
+tests/test_ml_and_missed_trade.py::TestMLLevelDetector::test_detect_swing_points_empty_or_tiny PASSED [ 64%]
+tests/test_ml_and_missed_trade.py::TestMLLevelDetector::test_detect_swing_points_returns_lists PASSED [ 65%]
+tests/test_ml_and_missed_trade.py::TestMLLevelDetector::test_kmeans_clustering PASSED [ 67%]
+tests/test_ml_and_missed_trade.py::TestMLLevelDetector::test_detect_levels_returns_list_of_tuples PASSED [ 68%]
+tests/test_ml_and_missed_trade.py::TestMLLevelDetector::test_detect_levels_empty_or_tiny_returns_empty PASSED [ 69%]
+tests/test_ml_and_missed_trade.py::TestMissedTradeDetector::test_detect_missed_trades_empty_signals PASSED [ 70%]
+tests/test_ml_and_missed_trade.py::TestMissedTradeDetector::test_detect_missed_trades_marks_unexecuted PASSED [ 71%]
+tests/test_ml_and_missed_trade.py::TestMissedTradeDetector::test_get_missed_trades_summary_empty PASSED [ 72%]
+tests/test_ml_and_missed_trade.py::TestMissedTradeDetector::test_export_missed_trades PASSED [ 74%]
+tests/test_option_chain.py::TestOptionChainValidation::test_option_chain_requires_strike_ltp PASSED [ 75%]
+tests/test_option_chain.py::TestOptionChainValidation::test_option_chain_with_nan_strikes_dropped PASSED [ 76%]
+tests/test_option_chain.py::TestOptionChainFallback::test_load_latest_option_snapshot_missing_dir PASSED [ 77%]
+tests/test_option_chain.py::TestOptionChainFallback::test_load_latest_option_snapshot_valid PASSED [ 78%]
+tests/test_option_chain.py::TestLogCleanup::test_cleanup_old_logs_removes_e2e_and_system_test PASSED [ 80%]
+tests/test_option_chain.py::TestLogCleanup::test_cleanup_keeps_trading_log_when_requested PASSED [ 81%]
+tests/test_patterns.py::TestCandlestickPatternDetector::test_detect_patterns_returns_df PASSED [ 82%]
+tests/test_patterns.py::TestCandlestickPatternDetector::test_get_latest_pattern PASSED [ 83%]
+tests/test_position_sizing.py::TestMoneyness::test_atm_call PASSED       [ 84%]
+tests/test_position_sizing.py::TestMoneyness::test_itm_otm_call PASSED   [ 85%]
+tests/test_position_sizing.py::TestMoneyness::test_itm_otm_put PASSED    [ 87%]
+tests/test_position_sizing.py::TestPositionSizer::test_select_strike_best_return_all PASSED [ 88%]
+tests/test_position_sizing.py::TestPositionSizer::test_select_strike_atm_preference PASSED [ 89%]
+tests/test_position_sizing.py::TestPositionSizer::test_select_optimal_strike_legacy PASSED [ 90%]
+tests/test_position_sizing.py::TestPositionSizer::test_select_optimal_strike_with_underlying PASSED [ 91%]
+tests/test_position_sizing.py::TestPositionSizer::test_adjust_lot_size PASSED [ 92%]
+tests/test_position_sizing.py::TestPositionSizer::test_select_strike_from_option_chain PASSED [ 94%]
+tests/test_position_sizing.py::TestPositionSizer::test_select_strike_from_option_chain_put PASSED [ 95%]
+tests/test_position_sizing.py::TestPositionSizer::test_select_strike_from_option_chain_invalid PASSED [ 96%]
+tests/test_risk.py::TestRiskManager::test_can_trade_initially PASSED     [ 97%]
+tests/test_risk.py::TestRiskManager::test_auto_lock_after_two_trades PASSED [ 98%]
+tests/test_risk.py::TestRiskManager::test_unlock_trading PASSED          [100%]
+
+============================== warnings summary ===============================
+tests/test_e2e_data_flow.py::test_e2e_broker_connect
+tests/test_e2e_data_flow.py::test_e2e_data_flow_live
+  C:\Users\shiba\OneDrive\Desktop\varunpandya-1011-main\varunpandya-1011\apps\trading\venv\Lib\site-packages\SmartApi\smartConnect.py:110: DeprecationWarning: ssl.OP_NO_SSL*/ssl.OP_NO_TLS* options are deprecated
+    self.ssl_context.options |= ssl.OP_NO_TLSv1  # Disable TLS 1.0
+
+tests/test_e2e_data_flow.py::test_e2e_broker_connect
+tests/test_e2e_data_flow.py::test_e2e_data_flow_live
+  C:\Users\shiba\OneDrive\Desktop\varunpandya-1011-main\varunpandya-1011\apps\trading\venv\Lib\site-packages\SmartApi\smartConnect.py:111: DeprecationWarning: ssl.OP_NO_SSL*/ssl.OP_NO_TLS* options are deprecated
+    self.ssl_context.options |= ssl.OP_NO_TLSv1_1  # Disable TLS 1.1
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+================= 84 passed, 1 skipped, 4 warnings in 33.71s ==================

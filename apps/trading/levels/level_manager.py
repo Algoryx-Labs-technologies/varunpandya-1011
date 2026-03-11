@@ -166,10 +166,10 @@ class LevelManager:
             # Traditional indicator-based levels
             pivot_levels = self._compute_pivot_points(df)
             levels.extend(pivot_levels)
-            
+            logger.debug("[levels] compute_auto_levels pivot=%s", len(pivot_levels))
             cluster_levels = self._compute_kmeans_levels(df, num_clusters=num_levels // 2)
             levels.extend(cluster_levels)
-            
+            logger.debug("[levels] compute_auto_levels kmeans=%s", len(cluster_levels))
             atr_levels = self._compute_atr_levels(df)
             levels.extend(atr_levels)
             
@@ -417,13 +417,24 @@ class LevelManager:
         Get all levels (manual + automatic) for a timeframe.
         Used every trade cycle: (1) Manual – user-defined from CSV/Excel/UI.
         (2) Automatic – from ML and indicators (pivot, K-Means, ATR, Bollinger, SAR, ML detector).
-        Both sets are combined for signal generation.
+        Both sets are combined for signal generation. Returns [] for None or empty timeframe.
         """
+        timeframe = (timeframe or "").strip().lower()
+        if not timeframe:
+            return []
+        try:
+            from utils.logging_config import step_log as _step
+            _step("levels", "get_levels", "request", timeframe=timeframe)
+        except ImportError:
+            pass
         levels = []
         if timeframe in self.manual_levels:
             levels.extend(self.manual_levels[timeframe])
         if timeframe in self.auto_levels:
             levels.extend(self.auto_levels[timeframe])
+        n_manual = len(self.manual_levels.get(timeframe, []))
+        n_auto = len(self.auto_levels.get(timeframe, []))
+        logger.debug("[levels] get_levels timeframe=%s manual=%s auto=%s total=%s", timeframe, n_manual, n_auto, len(levels))
         return sorted(levels, key=lambda x: x.price)
     
     def get_levels_by_type(self, timeframe: str, level_type: str) -> List[Level]:

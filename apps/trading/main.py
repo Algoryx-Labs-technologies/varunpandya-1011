@@ -23,6 +23,10 @@ try:
     from utils.logging_alert import set_alerts_callback
 except ImportError:
     set_alerts_callback = lambda cb: None
+try:
+    from utils.logging_config import step_log as _step
+except ImportError:
+    def _step(m, s, d="", **k): logger.info(f"[{m}] {s} | {d}")
 
 
 class TradingBot:
@@ -43,6 +47,7 @@ class TradingBot:
         self.running = False
         self.active_trades: Dict[str, TradeSignal] = {}
         self.market_data_cache: Dict = {}
+        self._feed = None  # AngelOneFeed for real-time WebSocket LTP
         # Trade cycle: net PnL for current day (reset on new day); used when ENABLE_NET_PNL_TARGET is True
         self._cycle_net_pnl = 0.0
         self._cycle_date = datetime.now().date()
@@ -66,6 +71,15 @@ class TradingBot:
         if not self.broker.connect():
             logger.error("Failed to connect to Angel One API")
             return False
+        # Start real-time WebSocket feed for index LTP (optional)
+        try:
+            from broker.feed_websocket import AngelOneFeed
+            self._feed = AngelOneFeed()
+            if self._feed.start(self.broker):
+                _step("main", "initialize", "WebSocket feed started")
+        except Exception as e:
+            logger.debug("WebSocket feed not started: %s", e)
+            self._feed = None
         
         # Load manual levels if file exists (CSV or Excel from LEVELS_FILE)
         levels_path = Config.BASE_DIR / Config.LEVELS_FILE
@@ -93,7 +107,7 @@ class TradingBot:
         self.risk_manager.start_monitoring()
         
         logger.info("Starting trading bot main loop...")
-        
+        _step("main", "run", "loop started")
         try:
             while self.running:
                 # Reset cycle PnL and risk daily state on new day
@@ -121,7 +135,7 @@ class TradingBot:
                     try:
                         self._process_index(index)
                     except Exception as e:
-                        logger.error(f"Error processing {index}: {str(e)}")
+                        logger.exception("Error processing index %s: %s", index, e)
                 
                 # Check exit conditions for active trades
                 self._check_exit_conditions()
@@ -137,20 +151,23 @@ class TradingBot:
     def _process_index(self, index: str):
         """Process trading signals for an index"""
         try:
+            _step("main", "_process_index", "start", index=index)
             # Fetch current price
             current_price = self.data_fetcher.get_current_price(index)
             if not current_price:
                 logger.warning(f"Could not get current price for {index}")
+                _step("main", "_process_index", "skip no price", index=index)
                 return
-            
+            _step("main", "_process_index", "current_price OK", index=index, price=current_price)
             # Process each timeframe
             for timeframe in Config.TIMEFRAMES:
                 # Fetch OHLC data
                 df = self.data_fetcher.fetch_ohlc_data(index, timeframe, days_back=1)
                 if df is None or len(df) < 10:
                     logger.warning(f"Insufficient data for {index} {timeframe}")
+                    _step("main", "_process_index", "insufficient OHLC", index=index, timeframe=timeframe)
                     continue
-                
+                _step("main", "_process_index", "OHLC OK", index=index, timeframe=timeframe, rows=len(df))
                 # Compute auto levels if not already done
                 if timeframe not in self.level_manager.auto_levels:
                     self.level_manager.compute_auto_levels(df, timeframe)
@@ -181,11 +198,19 @@ class TradingBot:
                         'calls': chain['calls'].to_dict('records') if hasattr(chain.get('calls'), 'to_dict') else (chain.get('calls') or []),
                         'puts': chain['puts'].to_dict('records') if hasattr(chain.get('puts'), 'to_dict') else (chain.get('puts') or []),
                     }
+                    try:
+                        from data.historical_storage import save_option_chain_snapshot
+                        save_option_chain_snapshot(index, payload)
+                    except Exception:
+                        pass
                     self.backend_api.send_option_chain(payload)
+                    _step("main", "_process_index", "option_chain sent to backend", index=index)
             except Exception as oc_err:
-                logger.debug(f"Option chain send: {oc_err}")
+                logger.debug("Option chain send: %s", oc_err)
+            _step("main", "_process_index", "done", index=index)
         except Exception as e:
-            logger.error(f"Error processing {index}: {str(e)}")
+            logger.exception("Error processing index %s: %s", index, e)
+            _step("main", "_process_index", "error", index=index, error=str(e))
     
     def _execute_signal(self, signal: TradeSignal, index: str, current_price: float):
         """Execute a trading signal"""
@@ -208,13 +233,19 @@ class TradingBot:
                 logger.info(f"Cannot execute signal: {reason}")
                 return
             
-            # Get real-time option chain (all strike/price/symbol from live data)
+            # Get real-time option chain (NSE or fallback from historical)
             option_chain = self.data_fetcher.fetch_option_chain(index)
             if not option_chain:
-                logger.error(f"Could not fetch option chain for {index}")
+                try:
+                    from data.historical_storage import load_latest_option_snapshot
+                    option_chain = load_latest_option_snapshot(index)
+                except Exception:
+                    option_chain = None
+            if not option_chain:
+                logger.error(f"Could not fetch option chain for {index} (NSE and fallback failed)")
                 return
 
-            # Select strike from real-time option chain (user daily list if set, else ATM/ITM/OTM best return)
+            # Select strike from option chain (user daily list if set, else ATM/ITM/OTM best return)
             daily_strikes = Config.get_daily_strikes(index)
             result = self.position_sizer.select_strike_from_option_chain(
                 option_chain=option_chain,
@@ -231,12 +262,17 @@ class TradingBot:
             selected_strike, quantity, capital_used, moneyness, option_symbol = result
             # Option price from chain (LTP used for sizing)
             option_price = capital_used / quantity if quantity else 0
-            if (option_chain.get('calls') is not None or option_chain.get('puts') is not None):
-                options_df = option_chain['calls'] if signal.direction == 'call' else option_chain['puts']
-                match = options_df.iloc[(options_df['strike'].astype(float) - selected_strike).abs().argmin()]
-                option_price = float(match.get('ltp', option_price) if hasattr(match, 'get') else getattr(match, 'ltp', option_price))
-                if not option_symbol:
-                    option_symbol = match.get('symbol', '') if hasattr(match, 'get') else getattr(match, 'symbol', '')
+            options_df = option_chain.get('calls') if signal.direction == 'call' else option_chain.get('puts')
+            if options_df is not None and hasattr(options_df, 'iloc') and len(options_df) > 0 and 'strike' in getattr(options_df, 'columns', []):
+                try:
+                    strike_ser = options_df['strike'].astype(float)
+                    idx = (strike_ser - selected_strike).abs().argmin()
+                    match = options_df.iloc[idx]
+                    option_price = float(match.get('ltp', option_price) if hasattr(match, 'get') else getattr(match, 'ltp', option_price))
+                    if not option_symbol:
+                        option_symbol = match.get('symbol', '') if hasattr(match, 'get') else getattr(match, 'symbol', '')
+                except (IndexError, KeyError, TypeError, ValueError):
+                    pass
 
             # Get option token (would need to fetch from broker)
             option_token = str(selected_strike)  # Placeholder; in production fetch from broker instrument list
@@ -286,7 +322,7 @@ class TradingBot:
                 logger.error(f"Failed to place order: {order_response}")
         
         except Exception as e:
-            logger.error(f"Error executing signal: {str(e)}")
+            logger.exception("Error executing signal: %s", e)
     
     def _check_exit_conditions(self):
         """Check exit conditions for all active trades"""
@@ -311,7 +347,7 @@ class TradingBot:
                     del self.active_trades[index]
             
             except Exception as e:
-                logger.error(f"Error checking exit for {index}: {str(e)}")
+                logger.exception("Error checking exit for %s: %s", index, e)
     
     def _exit_trade(self, signal: TradeSignal, exit_price: float, reason: str):
         """Exit a trade"""
@@ -380,7 +416,7 @@ class TradingBot:
             logger.info(f"Trade exited: {signal.index} | Reason: {reason} | P&L: {pnl:.2f}")
         
         except Exception as e:
-            logger.error(f"Error exiting trade: {str(e)}")
+            logger.exception("Error exiting trade: %s", e)
     
     def _update_backend_market_data(self, index: str, timeframe: str, df, current_price: float):
         """Update backend with market data and OHLC candles for chart/DB."""
@@ -412,12 +448,17 @@ class TradingBot:
                 if candles:
                     self.backend_api.send_ohlc(index, timeframe, candles[-500:])
         except Exception as e:
-            logger.debug(f"Error updating backend market data: {str(e)}")
+            logger.debug("Error updating backend market data: %s", e)
     
     def shutdown(self):
         """Shutdown the trading bot"""
         logger.info("Shutting down trading bot...")
         self.running = False
+        if getattr(self, "_feed", None):
+            try:
+                self._feed.stop()
+            except Exception:
+                pass
         self.risk_manager.stop_monitoring()
         
         # Export journal

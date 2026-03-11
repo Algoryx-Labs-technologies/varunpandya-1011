@@ -10,6 +10,10 @@ from loguru import logger
 from broker.angel_one import AngelOneBroker
 from strategy.trading_strategy import TradeSignal
 from risk.risk_manager import RiskManager
+try:
+    from utils.logging_config import step_log as _step
+except ImportError:
+    def _step(m, s, d="", **k): logger.info(f"[{m}] {s} | {d}")
 
 
 class ExecutionEngine:
@@ -24,10 +28,12 @@ class ExecutionEngine:
         self.position_lock = threading.Lock()
     
     def start(self):
-        """Start all monitoring threads"""
+        """Start all monitoring threads. No-op if broker or risk_manager is None."""
+        if self.broker is None or self.risk_manager is None:
+            logger.warning("ExecutionEngine.start: broker or risk_manager is None; skip")
+            return
         if self.running:
             return
-        
         self.running = True
         
         # Position updater thread (every 2 seconds)
@@ -53,12 +59,13 @@ class ExecutionEngine:
             name="TradeTrimmer"
         )
         self.threads['trade_trimmer'].start()
-        
+        _step("execution", "start", "all threads started")
         logger.info("Execution engine started with all threads")
     
     def stop(self):
         """Stop all threads"""
         self.running = False
+        _step("execution", "stop", "running=False")
         logger.info("Execution engine stopped")
     
     def _position_updater(self):
@@ -83,7 +90,7 @@ class ExecutionEngine:
                 
                 time.sleep(2)
             except Exception as e:
-                logger.error(f"Error in position updater: {e}")
+                logger.exception("Error in position updater: %s", e)
                 time.sleep(5)
     
     def _trade_monitor(self):
@@ -108,7 +115,7 @@ class ExecutionEngine:
                 
                 time.sleep(5)
             except Exception as e:
-                logger.error(f"Error in trade monitor: {e}")
+                logger.exception("Error in trade monitor: %s", e)
                 time.sleep(10)
     
     def _trade_trimmer(self):
@@ -154,5 +161,5 @@ class ExecutionEngine:
             logger.info(f"Signal execution requested: {signal.index} {signal.direction}")
             return True
         except Exception as e:
-            logger.error(f"Error executing signal: {e}")
+            logger.exception("Error executing signal: %s", e)
             return False

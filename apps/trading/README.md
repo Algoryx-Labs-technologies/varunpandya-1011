@@ -214,8 +214,24 @@ To run only the system test (no bot), with output to file and console:
 
 Logs are written to `logs/system_test_YYYYMMDD_HHMMSS.log` and printed to the terminal.
 
+## Testing (real historical data)
+
+Tests are designed to run on **real historical OHLC data** that has been fetched and saved:
+
+1. **Fetch data first** (so tests use live-fetched data): run the E2E script once to populate `data/historical/index_ohlc/`:
+   ```powershell
+   .\venv\Scripts\python.exe tests/run_e2e_with_logs.py
+   ```
+2. **Run tests**: indicators, levels, patterns, ML, and E2E flow tests then use this saved OHLC when available; otherwise they fall back to synthetic dummy data.
+   ```powershell
+   .\venv\Scripts\python.exe -m pytest tests/ -v
+   ```
+3. **Historical-only tests** (`tests/test_historical_data.py`): run only when fetched data exists; they are skipped with a clear message if `data/historical/index_ohlc/` has no OHLC files.
+
+See **`tests/README.md`** for fixture details (`historical_ohlc_df`, `real_ohlc_df`) and test layout.
+
 ## Debugging / Common issues
 
 - **`ModuleNotFoundError: No module named 'smartapi'`** – The Angel One package imports as `SmartApi` (capital S, A). Use `from SmartApi import SmartConnect`. If you see missing **logzero** or **websocket**, run `pip install -r requirements-venv.txt` (they are listed as dependencies).
-- **Tests:** From `apps/trading`, run `.\venv\Scripts\python.exe -m pytest tests/ -v`. Pytest is in `requirements-venv.txt`.
+- **Tests:** From `apps/trading`, run `.\venv\Scripts\python.exe -m pytest tests/ -v`. Pytest is in `requirements-venv.txt`. For tests to use real fetched data, run `tests/run_e2e_with_logs.py` first to populate historical OHLC.
 - **TA-Lib:** If the folder `ta-lib-0.6.4` is missing at repo root, the bot still runs using the Python TA-Lib wheel (no local DLL). Run scripts add the folder to PATH only when present.

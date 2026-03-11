@@ -18,13 +18,13 @@ class TestCandlestickPatternDetector:
     def detector(self):
         return CandlestickPatternDetector()
 
-    def test_detect_patterns_returns_df(self, detector, dummy_ohlc_df):
-        df = detector.detect_patterns(dummy_ohlc_df)
+    def test_detect_patterns_returns_df(self, detector, real_ohlc_df):
+        df = detector.detect_patterns(real_ohlc_df)
         assert df is not None
-        assert len(df) == len(dummy_ohlc_df)
+        assert len(df) == len(real_ohlc_df)
 
-    def test_get_latest_pattern(self, detector, dummy_ohlc_df):
-        df = detector.detect_patterns(dummy_ohlc_df)
+    def test_get_latest_pattern(self, detector, real_ohlc_df):
+        df = detector.detect_patterns(real_ohlc_df)
         latest = detector.get_latest_pattern(df)
         # May be None if no pattern at last candle
         if latest is not None:

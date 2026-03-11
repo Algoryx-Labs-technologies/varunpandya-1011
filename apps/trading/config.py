@@ -141,7 +141,10 @@ class Config:
     
     @classmethod
     def get_allocation(cls, index: str) -> float:
-        """Get capital allocation for an index"""
+        """Get capital allocation for an index. Returns 0 for None or unknown index."""
+        if index is None:
+            return 0.0
+        index = (index or "").strip().upper()
         allocations = {
             'NIFTY': cls.NIFTY_ALLOCATION,
             'BANKNIFTY': cls.BANKNIFTY_ALLOCATION,

@@ -320,7 +320,11 @@ class PositionSizer:
             return None
 
         strike, qty, capital_used, moneyness = result
-        # Match by value (float) to get symbol from chain
-        idx = min(range(len(strikes)), key=lambda i: abs(float(strikes[i]) - float(strike))) if strikes else 0
-        symbol = symbols[idx] if symbols and idx < len(symbols) else ""
+        # Match by value (float) to get symbol from chain; guard symbols length
+        if not strikes:
+            return (strike, qty, capital_used, moneyness, "")
+        idx = min(range(len(strikes)), key=lambda i: abs(float(strikes[i]) - float(strike)))
+        symbol = (symbols[idx] if idx < len(symbols) else (symbols[0] if symbols else ""))
+        if not isinstance(symbol, str):
+            symbol = str(symbol) if symbol is not None else ""
         return (strike, qty, capital_used, moneyness, symbol)

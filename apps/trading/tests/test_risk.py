@@ -5,7 +5,7 @@ Run from apps/trading: pytest tests/test_risk.py -v
 import pytest
 import sys
 from pathlib import Path
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 pytest.importorskip("SmartApi")
 
@@ -22,12 +22,15 @@ class TestRiskManager:
         b.get_position.return_value = []
         return b
 
-    def test_can_trade_initially(self, mock_broker):
+    @patch.object(RiskManager, "_is_kill_switch_time", return_value=False)
+    def test_can_trade_initially(self, mock_kill, mock_broker):
+        """can_trade is True when not locked and not kill-switch time (kill switch mocked)."""
         rm = RiskManager(mock_broker)
         can, reason = rm.can_trade()
         assert can is True
 
-    def test_auto_lock_after_two_trades(self, mock_broker):
+    @patch.object(RiskManager, "_is_kill_switch_time", return_value=False)
+    def test_auto_lock_after_two_trades(self, mock_kill, mock_broker):
         rm = RiskManager(mock_broker)
         rm.max_trades = 2
         rm.record_trade()

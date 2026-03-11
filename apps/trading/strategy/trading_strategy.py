@@ -11,6 +11,10 @@ from datetime import datetime, timedelta
 from levels.level_manager import LevelManager, Level
 from patterns.candlestick_patterns import CandlestickPatternDetector
 from config import Config
+try:
+    from utils.logging_config import step_log as _step
+except ImportError:
+    def _step(m, s, d="", **k): logger.info(f"[{m}] {s} | {d}")
 
 
 class TradeSignal:
@@ -84,12 +88,15 @@ class TradingStrategy:
         """
         Generate trading signals from levels and patterns. Returns [] on invalid input.
         """
+        _step("strategy", "generate_signals", "start", index=index, timeframe=timeframe, rows=len(df) if df is not None else 0)
         signals = []
         if df is None or (hasattr(df, "empty") and df.empty) or len(df) < 2:
             logger.debug("generate_signals: insufficient OHLC data")
+            _step("strategy", "generate_signals", "insufficient data")
             return []
         if current_price is None or not (isinstance(current_price, (int, float)) and float(current_price) > 0):
             logger.debug("generate_signals: invalid current_price")
+            _step("strategy", "generate_signals", "invalid current_price")
             return []
         current_price = float(current_price)
         index = (index or "").strip().upper()
@@ -100,7 +107,9 @@ class TradingStrategy:
             df_with_patterns = df
         levels = self.level_manager.get_levels(timeframe) or []
         if not levels:
+            _step("strategy", "generate_signals", "no levels", timeframe=timeframe)
             return []
+        _step("strategy", "generate_signals", "levels and patterns OK", levels=len(levels))
 
         for level in levels:
             # Check for level break with pattern
@@ -123,7 +132,8 @@ class TradingStrategy:
                 if signal:
                     signals.append(signal)
                     logger.info(f"Signal generated: {signal.direction} {index} @ {signal.entry_price}")
-        
+                    _step("strategy", "generate_signals", "signal created", direction=signal.direction, level_type=level.level_type, pattern=signal.pattern)
+        _step("strategy", "generate_signals", "done", count=len(signals))
         return signals
     
     def _create_signal(
@@ -179,7 +189,7 @@ class TradingStrategy:
             return signal
             
         except Exception as e:
-            logger.error(f"Error creating signal: {str(e)}")
+            logger.exception("Error creating signal: %s", e)
             return None
     
     def _find_target_level(
@@ -237,7 +247,13 @@ class TradingStrategy:
         Returns:
             (should_exit, reason, exit_price)
         """
-        if signal.status != 'executed':
+        if signal is None:
+            return False, '', 0.0
+        if df is None or (hasattr(df, "empty") and df.empty) or len(df) < 2:
+            return False, '', 0.0
+        if current_price is None or (isinstance(current_price, float) and (current_price != current_price or current_price <= 0)):
+            return False, '', 0.0
+        if getattr(signal, "status", None) != 'executed':
             return False, '', 0.0
         
         # Find entry index in dataframe

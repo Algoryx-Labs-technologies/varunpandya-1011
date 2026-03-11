@@ -38,3 +38,7 @@ Use **levels_sample.csv** or **levels_sample.xlsx** as a reference for adding le
 
 - **Python bot**: Set `LEVELS_FILE` in `.env` (e.g. `levels/levels.csv`). On startup the bot loads the file if it exists (required columns: `price`, `type`, `timeframe`).  
 - **GUI**: In the Trading tab, use “Add level” with the type dropdown, or “Load from file” and choose your CSV/Excel.
+
+## Testing levels with real data
+
+Level tests use **real historical OHLC** when available (from `data/historical/index_ohlc/`, populated by `tests/run_e2e_with_logs.py`). See `tests/README.md` and `tests/test_levels.py`, `tests/test_historical_data.py`.

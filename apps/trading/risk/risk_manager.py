@@ -35,8 +35,8 @@ def _parse_kill_switch_time(s: str) -> Tuple[int, int]:
 class RiskManager:
     """Manages risk controls and position monitoring"""
 
-    def __init__(self, broker: AngelOneBroker):
-        self.broker = broker
+    def __init__(self, broker: Optional[AngelOneBroker] = None):
+        self.broker = broker  # May be None in tests; kill_switch will no-op
         self.trade_count = 0
         self.max_trades = max(0, int(getattr(Config, "MAX_TRADES_PER_DAY", 4) or 4))
         self.trade_cycles = max(1, int(getattr(Config, "TRADE_CYCLES", 2) or 2))
@@ -118,11 +118,11 @@ class RiskManager:
             return False
     
     def execute_kill_switch(self):
-        """Execute kill switch: cancel all orders, square off all positions at LTP, wait 30s, then lock. No-op in paper mode."""
+        """Execute kill switch: cancel all orders, square off all positions at LTP, wait 30s, then lock. No-op in paper mode or if broker is None."""
         logger.warning("Executing kill switch...")
         alert(ALERT_CRITICAL, "Kill switch executed", {"time": datetime.now().isoformat()})
         try:
-            if not getattr(Config, "PAPER_TRADING", False):
+            if not getattr(Config, "PAPER_TRADING", False) and self.broker is not None:
                 self.broker.squareoff(exchange=Config.EXCHANGE, wait_seconds=30)
             else:
                 logger.info("[PAPER] Kill switch: skipping squareoff")
@@ -161,9 +161,12 @@ class RiskManager:
             time.sleep(60)  # Check every minute
     
     def _monitor_positions(self):
-        """Monitor positions every 2 seconds"""
+        """Monitor positions every 2 seconds. No-op if broker is None."""
         while self.monitoring:
             try:
+                if self.broker is None:
+                    time.sleep(2)
+                    continue
                 positions = self.broker.get_position()
                 # Log position updates if needed
                 if positions:

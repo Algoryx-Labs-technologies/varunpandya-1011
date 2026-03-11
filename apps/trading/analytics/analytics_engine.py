@@ -24,6 +24,10 @@ import pandas as pd
 from loguru import logger
 
 from journal.trade_journal import Trade, TradeJournal
+try:
+    from utils.logging_config import step_log as _step
+except ImportError:
+    def _step(m, s, d="", **k): logger.info(f"[{m}] {s} | {d}")
 
 
 @dataclass
@@ -59,7 +63,7 @@ class AnalyticsEngine:
     drawdown, and multi-factor performance breakdowns.
     """
 
-    def __init__(self, journal: TradeJournal) -> None:
+    def __init__(self, journal: Optional[TradeJournal] = None) -> None:
         self.journal = journal
 
     def compute_statistics(self) -> Dict[str, Any]:
@@ -69,8 +73,13 @@ class AnalyticsEngine:
         level type, timeframe, index, and pattern.
         """
         try:
+            _step("analytics", "compute_statistics", "start")
+            if self.journal is None:
+                _step("analytics", "compute_statistics", "no journal")
+                return self._empty_stats()
             trades = self.journal.trades or []
             if not trades:
+                _step("analytics", "compute_statistics", "no trades")
                 return self._empty_stats()
 
             df = pd.DataFrame([self._trade_to_row(t) for t in trades])

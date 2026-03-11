@@ -12,9 +12,20 @@ from datetime import datetime
 APP_ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(APP_ROOT))
 
-# Setup file logger first
+# Log dir: cleanup previous logs so only this run's logs are recent
 LOG_DIR = APP_ROOT / "logs"
 LOG_DIR.mkdir(exist_ok=True)
+
+
+def _cleanup_logs():
+    try:
+        from utils.log_cleanup import cleanup_old_logs
+        return cleanup_old_logs(LOG_DIR, keep_recent=True, keep_trading_log=True)
+    except Exception:
+        return 0
+
+
+# This run's log file (after cleanup)
 LOG_FILE = LOG_DIR / f"system_test_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
 
 import os
@@ -196,10 +207,47 @@ def test_data_fetcher_no_broker() -> None:
     fetcher = DataFetcher(broker)
     for idx in ["NIFTY", "BANKNIFTY", "FINNIFTY"]:
         token = fetcher.get_index_token(idx)
-        log.info("  get_index_token(%s) = %s", idx, token)
+        ts = fetcher.get_index_tradingsymbol(idx)
+        log.info("  get_index_token(%s) = %s  tradingsymbol = %s", idx, token, ts)
     log.info("DataFetcher token lookup OK (live OHLC requires broker connect)")
 
+
+def test_data_flow_live() -> None:
+    """Full data flow: broker connect -> LTP -> OHLC -> option chain per index. Logs each step."""
+    section("DATA FLOW (live broker + NSE)")
+    from config import Config
+    from broker.angel_one import AngelOneBroker
+    from data.data_fetcher import DataFetcher
+    broker = AngelOneBroker()
+    if not (getattr(broker, "totp_secret") or "").strip():
+        log.warning("  SKIP data flow: ANGEL_ONE_TOTP_SECRET not set")
+        return
+    if not broker.connect():
+        log.warning("  SKIP data flow: broker connect failed")
+        return
+    fetcher = DataFetcher(broker)
+    indices = list(getattr(Config, "INDEX_SYMBOLS", {}).keys()) or ["NIFTY", "BANKNIFTY", "FINNIFTY"]
+    timeframes = getattr(Config, "TIMEFRAMES", []) or ["1m", "5m", "15m"]
+    for index in indices:
+        log.info("  --- %s ---", index)
+        price = fetcher.get_current_price(index)
+        log.info("    get_current_price = %s", price)
+        for tf in timeframes:
+            df = fetcher.fetch_ohlc_data(index, tf, days_back=1)
+            log.info("    fetch_ohlc(%s) = %s rows", tf, len(df) if df is not None else 0)
+        chain = fetcher.fetch_option_chain(index)
+        if chain:
+            nc = getattr(chain.get("calls"), "shape", (0,))[0] if hasattr(chain.get("calls"), "shape") else len(chain.get("calls") or [])
+            np_ = getattr(chain.get("puts"), "shape", (0,))[0] if hasattr(chain.get("puts"), "shape") else len(chain.get("puts") or [])
+            log.info("    option_chain: calls=%s puts=%s underlying=%s", nc, np_, chain.get("underlying_value"))
+        else:
+            log.info("    option_chain = None")
+    log.info("Data flow (live) OK")
+
 def main() -> None:
+    n = _cleanup_logs()
+    if n:
+        log.info("Cleaned %s previous log file(s); keeping recent logs only", n)
     log.info("System test started. Log file: %s", LOG_FILE)
     try:
         test_config()
@@ -210,6 +258,7 @@ def main() -> None:
         test_ml_levels()
         test_data_fetcher_no_broker()
         test_broker()
+        test_data_flow_live()
         test_backend_api()
     except Exception as e:
         log.exception("System test failed: %s", e)

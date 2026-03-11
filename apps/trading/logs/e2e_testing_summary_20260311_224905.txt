@@ -1,0 +1,24 @@
+E2E testing run at 2026-03-11T22:49:05.561418
+============================================================
+
+1) Pytest (tests/)
+   Log: logs/pytest_full_20260311_224905.log
+   Result: PASS
+
+2) E2E script (run_e2e_with_logs.py)
+   Console capture: logs/e2e_console_20260311_224905.log
+   (Script also writes to logs/e2e_YYYYMMDD_HHMMSS.log)
+   Result: PASS
+
+3) System test (run_system_test.py)
+   Console capture: logs/system_test_console_20260311_224905.log
+   (Script also writes to logs/system_test_YYYYMMDD_HHMMSS.log)
+   Result: PASS
+
+============================================================
+All log files from this run:
+  C:\Users\shiba\OneDrive\Desktop\varunpandya-1011-main\varunpandya-1011\apps\trading\logs\pytest_full_20260311_224905.log
+  C:\Users\shiba\OneDrive\Desktop\varunpandya-1011-main\varunpandya-1011\apps\trading\logs\e2e_console_20260311_224905.log
+  C:\Users\shiba\OneDrive\Desktop\varunpandya-1011-main\varunpandya-1011\apps\trading\logs\system_test_console_20260311_224905.log
+
+Summary written to: C:\Users\shiba\OneDrive\Desktop\varunpandya-1011-main\varunpandya-1011\apps\trading\logs\e2e_testing_summary_20260311_224905.txt

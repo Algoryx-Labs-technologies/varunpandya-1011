@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import './OptionChainPanel.css';
 
-const BACKEND_URL = typeof window !== 'undefined' ? window.location.origin : '';
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000');
 
 function OptionChainPanel({ index, optionChainFromWs }) {
   const [chain, setChain] = useState(optionChainFromWs);
