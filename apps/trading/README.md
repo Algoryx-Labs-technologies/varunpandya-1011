@@ -49,13 +49,16 @@ pip install -r requirements.txt
 cp .env.example .env
 ```
 
-4. Configure your Angel One API credentials in `.env`:
+4. Configure your Angel One API credentials in `.env` (see `.env.example` for full list):
 ```
 ANGEL_ONE_API_KEY=your_api_key
 ANGEL_ONE_CLIENT_ID=your_client_id
 ANGEL_ONE_PASSWORD=your_password
 ANGEL_ONE_TOTP_SECRET=your_totp_secret
+ANGEL_ONE_MPIN=your_mpin   # if required instead of password
 ```
+
+**Optional – Market feed (separate SmartAPI for data/WebSocket):** When `ANGEL_ONE_MARKET_FEED_API_KEY` and `ANGEL_ONE_MARKET_FEED_CLIENT_ID` are set, the bot uses this connection for OHLC, option chain Greeks, and WebSocket LTP; orders/positions/risk still use the main `ANGEL_ONE_*` credentials. You can set `ANGEL_ONE_MARKET_FEED_PASSWORD`, `ANGEL_ONE_MARKET_FEED_TOTP_SECRET`, `ANGEL_ONE_MARKET_FEED_MPIN` to the same as trading or to the market-feed app’s own values.
 
 ## Paper vs Live Trading
 
@@ -115,14 +118,17 @@ Level types (see `levels/README_LEVELS.md` for full table):
 
 ```
 apps/trading/
-├── main.py                 # Main entry point
-├── config.py              # Configuration management
-├── requirements.txt       # Python dependencies
-├── .env.example          # Environment variables template
+├── main.py                     # Main entry point (trading + optional market-feed data broker)
+├── config.py                   # Configuration (incl. USE_MARKET_FEED from .env)
+├── requirements.txt            # Python dependencies (smartapi-python, TA-Lib, etc.)
+├── .env.example                # Environment template (broker + market feed section)
+├── run_system_test.py          # Full system test (config → broker → data flow → backend)
+├── run_data_system_test.py     # Data-only test (OHLC, option chain, WebSocket LTP)
+├── run_market_feed_data_test.py # Market-feed broker data test (when USE_MARKET_FEED set)
 ├── broker/
-│   └── angel_one.py      # Angel One API integration
-├── data/
-│   └── data_fetcher.py   # Data acquisition module
+│   ├── angel_one.py            # Angel One API (orders, LTP, historical, option Greeks; optional use_market_feed)
+│   ├── instruments.py          # NFO symbol → token (Scrip Master)
+│   └── feed_websocket.py       # SmartAPI WebSocket2 (index + NFO LTP; LTP in rupees)
 ├── levels/
 │   └── level_manager.py  # Support/resistance level management
 ├── patterns/
@@ -148,16 +154,20 @@ Key configuration options in `config.py` and `.env` (see `.env.example` for all)
 - `MIN_CANDLES_BEFORE_EXIT`: Min candles before take-profit or time-based exit (default: 7)
 - `CANDLES_BEFORE_SQUARE_OFF`: Target candles for square off (default: 10)
 - `MIN_CANDLE_BODY_SIZE`, `MIN_WICK_RATIO`, `PATTERN_MAX_BODY_SIZE`: Candlestick pattern filters (tune for stricter/looser detection)
-- `STRIKE_PREFERENCE`: `best_return` | `atm` | `itm` | `otm`
+- `STRIKE_PREFERENCE`: `best_return` | `atm` | `itm` | `otm` | `greeks_delta` | `greeks_theta` | `greeks_iv`
+  - **Greeks-based**: `greeks_delta` (prefer delta nearest target), `greeks_theta` (prefer lower time decay), `greeks_iv` (prefer lower IV). Requires Angel One option Greeks API (live market).
+- `GREEKS_DELTA_TARGET`: Target delta for calls when `STRIKE_PREFERENCE=greeks_delta` (default 0.4; puts use 1 − target).
 - `DAILY_STRIKES_NIFTY`, `DAILY_STRIKES_BANKNIFTY`, `DAILY_STRIKES_FINNIFTY`: Optional comma-separated strike list (e.g. `29050,29100,29150,29200`); when set, only these strikes are used
 - `ENABLE_NET_PNL_TARGET`, `NET_PNL_TARGET_PERCENT`: Optional; stop new trades when daily PnL % reached
 - `BACKEND_API_URL`: Backend base URL (e.g. http://localhost:3000)
 - `LEVELS_FILE`: Path to manual levels CSV/Excel (e.g. levels/levels.csv)
+- **Market feed (optional):** `ANGEL_ONE_MARKET_FEED_API_KEY`, `ANGEL_ONE_MARKET_FEED_CLIENT_ID`; optional `ANGEL_ONE_MARKET_FEED_PASSWORD`, `ANGEL_ONE_MARKET_FEED_TOTP_SECRET`, `ANGEL_ONE_MARKET_FEED_MPIN` (default to main credentials). When both key and client ID are set, `USE_MARKET_FEED` is true and the data/WebSocket broker uses this connection.
+- `LOG_LEVEL`: `INFO` (default) or `DEBUG` for full data/broker/API logs. `LOG_FILE`: e.g. `trading.log`.
 
 ## Strategy Logic
 
 1. **Signal generation**: Level break + qualifying candlestick pattern (see `TRADING_ENGINE_EXPLAINED.md` Section 4 for level types).
-2. **Entry**: Strike selection from option chain—**optimal allocation on strike prices based on highest historical return** (utilization × ATM weight when `STRIKE_PREFERENCE=best_return`); or user daily list via `DAILY_STRIKES_*`, or fixed `atm`/`itm`/`otm`; place order via broker.
+2. **Entry**: Strike selection from option chain—**optimal allocation** (utilization × ATM weight when `STRIKE_PREFERENCE=best_return`); or **Greeks-based** (`greeks_delta` / `greeks_theta` / `greeks_iv`) using Angel One option Greeks (delta, theta, IV); or user daily list via `DAILY_STRIKES_*`, or fixed `atm`/`itm`/`otm`; place order via broker (NFO token from instrument list).
 3. **Exit**: Stop loss immediate; take profit and time-based exit only after `MIN_CANDLES_BEFORE_EXIT` candles; square off after `CANDLES_BEFORE_SQUARE_OFF` candles.
 4. **Risk**: Auto-lock after max trades; **manual unlock** via Risk tab (Unlock trading) – bot polls backend and clears lock. Kill switch at `KILL_SWITCH_TIME` (broker `squareoff()`); optional cycle PnL target.
 
@@ -178,6 +188,12 @@ Trades are automatically logged to:
 - JSON: `data/trades_YYYYMMDD.json`
 - Excel: `data/trades_YYYYMMDD.xlsx`
 - CSV: `data/trades_YYYYMMDD.csv`
+
+## Current status (recent updates)
+
+- **Market feed**: Optional separate SmartAPI credentials (`ANGEL_ONE_MARKET_FEED_*`) for data/WebSocket; when set, the bot uses this connection for OHLC, option chain Greeks, and WebSocket LTP; orders/risk use main `ANGEL_ONE_*`. If market-feed login fails, the app falls back to the trading broker for data.
+- **WebSocket**: SmartAPI WebSocket2 — index + NFO option tokens; LTP converted from paise to rupees; NFO tokens subscribed when option chain is available at startup.
+- **Tests**: `run_system_test.py` (full system), `run_data_system_test.py` (data path + WebSocket LTP), `run_market_feed_data_test.py` (market-feed broker data). Logging: set `LOG_LEVEL=DEBUG` in `.env` for verbose logs.
 
 ## Notes
 
@@ -201,18 +217,27 @@ Or with venv: `.\venv\Scripts\python run_all_and_log.py` (Windows) / `venv/bin/p
 |--------|------|
 | Trading bot (main.py) | `logs/trading.log` (daily rotation, 30-day retention) |
 | System test | `logs/system_test_YYYYMMDD_HHMMSS.log` (one per run) |
+| E2E test | `logs/e2e_YYYYMMDD_HHMMSS.log` |
 
-The script runs the system test first (config, indicators, patterns, levels, strikes, ML, broker check, backend health), then the trading bot. The bot exits quickly if `ANGEL_ONE_TOTP_SECRET` is not set; its log is still written to `trading.log`.
+The script runs the system test first (config, indicators, patterns, levels, strikes, ML, broker check, live data flow, backend health), then the trading bot. The bot exits quickly if `ANGEL_ONE_TOTP_SECRET` is not set; its log is still written to `trading.log`.
 
-## System test only
+## System and data tests
 
-To run only the system test (no bot), with output to file and console:
+| Script | Purpose |
+|--------|--------|
+| `run_system_test.py` | Full system: config, indicators, patterns, levels, strike selection, ML, data fetcher, broker connect, live data flow (OHLC, option chain), backend health. |
+| `run_data_system_test.py` | Data path only (trading broker): OHLC, option chain, WebSocket LTP for indices. Verifies WebSocket LTP in rupees. |
+| `run_market_feed_data_test.py` | Same as data test but uses **market-feed broker** when `USE_MARKET_FEED` is set. Run after setting `ANGEL_ONE_MARKET_FEED_*` in `.env`. |
+
+Run from `apps/trading` (use `py -3` on Windows if `python` is not on PATH):
 
 ```powershell
-.\venv\Scripts\python.exe run_system_test.py
+py -3 run_system_test.py
+py -3 run_data_system_test.py
+py -3 run_market_feed_data_test.py   # requires market feed credentials
 ```
 
-Logs are written to `logs/system_test_YYYYMMDD_HHMMSS.log` and printed to the terminal.
+Logs: `logs/system_test_*.log`, console. Set `LOG_LEVEL=DEBUG` in `.env` for verbose data/broker/API logs.
 
 ## Testing (real historical data)
 
@@ -229,6 +254,12 @@ Tests are designed to run on **real historical OHLC data** that has been fetched
 3. **Historical-only tests** (`tests/test_historical_data.py`): run only when fetched data exists; they are skipped with a clear message if `data/historical/index_ohlc/` has no OHLC files.
 
 See **`tests/README.md`** for fixture details (`historical_ohlc_df`, `real_ohlc_df`) and test layout.
+
+## Options data and Greeks
+
+- **Option chain**: Fetched from NSE; LTP can be enriched from Angel One WebSocket/broker (real-time). Option chain is merged with **option Greeks** (delta, gamma, theta, vega, implied volatility) from Angel One REST API when broker is connected and market is live.
+- **Strike selection with Greeks**: Set `STRIKE_PREFERENCE=greeks_delta` (prefer strike with delta nearest `GREEKS_DELTA_TARGET`, default 0.4 for calls), `greeks_theta` (prefer lower absolute theta to reduce time decay), or `greeks_iv` (prefer lower IV for cheaper premium). Greeks are available only for live contracts during market hours.
+- **WebSocket (SmartAPI WebSocket2)**: Real-time LTP via `broker/feed_websocket.py`. Subscribes to **index tokens** (NSE_CM) and, when option chain is available at startup, **NFO option tokens** (NSE_FO). LTP from the feed is converted from paise to **rupees** (÷100) per [SmartAPI WebSocket2](https://smartapi.angelbroking.com/docs/WebSocket2). Quote (2) and SnapQuote (3) modes provide bid/ask/depth when needed.
 
 ## Debugging / Common issues
 

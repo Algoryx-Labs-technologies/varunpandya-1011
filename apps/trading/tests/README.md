@@ -1,6 +1,15 @@
 # Trading tests
 
-Unit and E2E tests for config, data fetcher, broker, strategy, levels, patterns, risk, journal, position sizing. **Testing is done on real-time historical data that has been fetched** when available; otherwise synthetic dummy data is used.
+Unit and E2E tests for config, data fetcher, broker, strategy, levels, patterns, risk, journal, position sizing. **Testing is done on real-time historical data that has been fetched** when available; otherwise synthetic dummy data is used. Config tests include strike preference values `best_return`, `atm`, `itm`, `otm`, and Greeks-based `greeks_delta`, `greeks_theta`, `greeks_iv`.
+
+**Scripts (run from `apps/trading`):**
+
+| Script | Purpose |
+|--------|--------|
+| `run_system_test.py` | Full system: config → indicators → patterns → levels → strike → ML → data fetcher → broker connect → live data flow → backend health. Log: `logs/system_test_*.log`. |
+| `run_data_system_test.py` | Data path only (trading broker): OHLC, option chain, WebSocket LTP (SmartAPI WebSocket2; LTP in rupees). |
+| `run_market_feed_data_test.py` | Same data checks using **market-feed broker** when `USE_MARKET_FEED` is set; requires `ANGEL_ONE_MARKET_FEED_*` in `.env`. |
+| `tests/run_e2e_with_logs.py` | E2E with step logging: broker connect → LTP → OHLC (1m/5m/15m) → option chain per index; populates `data/historical/index_ohlc/`. Log: `logs/e2e_*.log`. |
 
 Run from `apps/trading`. Install deps first:
 
@@ -25,7 +34,9 @@ Tests use **fetched historical OHLC** from `data/historical/index_ohlc/{index}/{
 3. **Tests using real data**: `test_indicators.py`, `test_levels.py`, `test_patterns.py`, `test_ml_and_missed_trade.py`, and `test_e2e_data_flow.py::test_e2e_levels_journal_ml_flow` use the **`real_ohlc_df`** fixture, so they run on fetched historical data when present.
 4. **`test_historical_data.py`**: Dedicated tests that **require** fetched historical OHLC (indicators, patterns, levels, ML, strategy on real data). They **skip** with a clear message if no data exists—run `run_e2e_with_logs.py` first to populate.
 
-No live API or real credentials are required for unit tests; when historical files are missing, tests fall back to dummy data or skip (historical-only tests).
+No live API or real credentials are required for unit tests; when historical files are missing, tests fall back to dummy data or skip (historical-only tests). **SmartApi SDK** is optional: when the Angel One SmartApi package is not installed, `conftest.py` mocks it so all tests (including broker, data_fetcher, Greeks, instruments) run without the SDK. Live broker connect and live data flow tests are skipped when SmartApi is mocked.
+
+**Data / WebSocket status:** The trading bot uses SmartAPI WebSocket2 for real-time index and NFO option LTP. LTP from the binary feed is converted from paise to rupees. System and data tests confirm broker connect, OHLC fetch, option chain request, and WebSocket LTP when credentials are set.
 
 ## Logging (per-folder)
 
@@ -69,4 +80,4 @@ pytest tests/test_data_dummy.py -v
 pytest tests/test_e2e_data_flow.py -v
 ```
 
-For full system description and run process, see repo root **`TRADING_ENGINE_EXPLAINED.md`**.
+For full system description and run process, see repo root **`TRADING_ENGINE_EXPLAINED.md`**. For architecture and market feed/WebSocket details, see **`SYSTEM_ARCHITECTURE.md`** and **`README.md`** in `apps/trading`.

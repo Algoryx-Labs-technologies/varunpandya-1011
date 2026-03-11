@@ -2,10 +2,12 @@
 Pytest fixtures for trading tests.
 Uses real historical OHLC from data/historical/index_ohlc when available (after fetch);
 otherwise falls back to dummy data. Add app root to path so imports work when running pytest from apps/trading.
+Mocks SmartApi so broker module can be imported when SDK is not installed.
 """
 import pytest
 import sys
 from pathlib import Path
+from unittest.mock import MagicMock
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
@@ -13,6 +15,18 @@ from datetime import datetime, timedelta
 APP_ROOT = Path(__file__).resolve().parent.parent
 if str(APP_ROOT) not in sys.path:
     sys.path.insert(0, str(APP_ROOT))
+
+# Allow tests to run without Angel One SmartApi SDK installed
+if "SmartApi" not in sys.modules:
+    _mock_smart = MagicMock()
+    sys.modules["SmartApi"] = _mock_smart
+    sys.modules["SmartApi"].SmartConnect = MagicMock()
+try:
+    if "SmartApi.smartWebSocketV2" not in sys.modules:
+        sys.modules["SmartApi.smartWebSocketV2"] = MagicMock()
+        sys.modules["SmartApi.smartWebSocketV2"].SmartWebSocketV2 = MagicMock()
+except Exception:
+    pass
 
 # Indices and timeframes to try when loading real historical data (same as config)
 _HISTORICAL_INDICES = ["NIFTY", "BANKNIFTY", "FINNIFTY"]

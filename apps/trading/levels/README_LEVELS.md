@@ -41,4 +41,4 @@ Use **levels_sample.csv** or **levels_sample.xlsx** as a reference for adding le
 
 ## Testing levels with real data
 
-Level tests use **real historical OHLC** when available (from `data/historical/index_ohlc/`, populated by `tests/run_e2e_with_logs.py`). See `tests/README.md` and `tests/test_levels.py`, `tests/test_historical_data.py`.
+Level tests use **real historical OHLC** when available (from `data/historical/index_ohlc/`, populated by `tests/run_e2e_with_logs.py` or `run_data_system_test.py`). See `tests/README.md` and `tests/test_levels.py`, `tests/test_historical_data.py`. For full data flow and WebSocket status, see `apps/trading/README.md` and `SYSTEM_ARCHITECTURE.md`.

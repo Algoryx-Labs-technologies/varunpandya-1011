@@ -48,6 +48,16 @@ class Config:
     # Tuple for broker: (api_key, client_secret, client_code, password, totp_secret)
     KEY_SECRET = (ANGEL_ONE_API_KEY, ANGEL_ONE_CLIENT_SECRET, ANGEL_ONE_CLIENT_ID, ANGEL_ONE_PASSWORD, ANGEL_ONE_TOTP_SECRET)
 
+    # Market feed (Smart API): separate credentials for market data only (historical OHLC, option chain enrichment, Greeks, WebSocket LTP).
+    # When set, the bot uses this connection for all market data; orders still use ANGEL_ONE_* above.
+    ANGEL_ONE_MARKET_FEED_API_KEY = (os.getenv('ANGEL_ONE_MARKET_FEED_API_KEY') or '').strip()
+    ANGEL_ONE_MARKET_FEED_CLIENT_ID = (os.getenv('ANGEL_ONE_MARKET_FEED_CLIENT_ID') or '').strip()
+    ANGEL_ONE_MARKET_FEED_PASSWORD = (os.getenv('ANGEL_ONE_MARKET_FEED_PASSWORD') or '').strip() or ANGEL_ONE_PASSWORD
+    ANGEL_ONE_MARKET_FEED_TOTP_SECRET = (os.getenv('ANGEL_ONE_MARKET_FEED_TOTP_SECRET') or '').strip() or ANGEL_ONE_TOTP_SECRET
+    ANGEL_ONE_MARKET_FEED_MPIN = (os.getenv('ANGEL_ONE_MARKET_FEED_MPIN') or '').strip() or ANGEL_ONE_MPIN
+    # True if market feed credentials are set (API key + client id); then use dedicated broker for data
+    USE_MARKET_FEED = bool(ANGEL_ONE_MARKET_FEED_API_KEY and ANGEL_ONE_MARKET_FEED_CLIENT_ID)
+
     # Trading Configuration (invalid env = use default)
     TRADING_CAPITAL = _float_env('TRADING_CAPITAL', 20000.0)
     NIFTY_ALLOCATION = _float_env('NIFTY_ALLOCATION', 0.5)
@@ -87,10 +97,12 @@ class Config:
     MIN_WICK_RATIO = _float_env('MIN_WICK_RATIO', 0.5)
     PATTERN_MAX_BODY_SIZE = _float_env('PATTERN_MAX_BODY_SIZE', 0.0)  # 0 = no max; set e.g. 0.6 to exclude very large bodies
     
-    # Strike selection: 'best_return' | 'atm' | 'itm' | 'otm'
-    _STRIKE_PREF_VALID = ('best_return', 'atm', 'itm', 'otm')
+    # Strike selection: 'best_return' | 'atm' | 'itm' | 'otm' | 'greeks_delta' | 'greeks_theta' | 'greeks_iv'
+    _STRIKE_PREF_VALID = ('best_return', 'atm', 'itm', 'otm', 'greeks_delta', 'greeks_theta', 'greeks_iv')
     _strike_pref = (os.getenv('STRIKE_PREFERENCE') or 'best_return').strip().lower()
     STRIKE_PREFERENCE = _strike_pref if _strike_pref in _STRIKE_PREF_VALID else 'best_return'
+    # Greeks-based selection: target delta for calls (e.g. 0.4 = slightly OTM). Used when STRIKE_PREFERENCE=greeks_delta.
+    GREEKS_DELTA_TARGET = _float_env('GREEKS_DELTA_TARGET', 0.4)
     # Optional daily strike list (comma-separated). If set, only these strikes are used for selection.
     # e.g. DAILY_STRIKES_NIFTY=29050,29100,29150,29200
     _daily_strikes_raw = {
@@ -133,8 +145,9 @@ class Config:
     # Timeframes
     TIMEFRAMES = ['1m', '5m', '15m']
     
-    # Exchange
+    # Exchange (NSE for equity/indices; NFO for options/futures)
     EXCHANGE = 'NSE'
+    EXCHANGE_NFO = 'NFO'
     PRODUCT_TYPE = 'INTRADAY'
     ORDER_DURATION = 'DAY'
     VARIETY = 'NORMAL'

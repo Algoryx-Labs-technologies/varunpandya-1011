@@ -26,7 +26,7 @@ class TestConfig:
 
     def test_strike_preference(self):
         pref = getattr(Config, "STRIKE_PREFERENCE", "best_return")
-        assert pref in ("best_return", "atm", "itm", "otm")
+        assert pref in ("best_return", "atm", "itm", "otm", "greeks_delta", "greeks_theta", "greeks_iv")
 
     def test_key_secret_tuple(self):
         key_secret = getattr(Config, "KEY_SECRET", None)

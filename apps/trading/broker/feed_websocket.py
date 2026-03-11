@@ -1,11 +1,13 @@
 """
 Real-time market data feed via Angel One SmartAPI WebSocket V2.
-Subscribes to index tokens (NSE_CM) for LTP; optional NSE_FO tokens for options.
+Subscribes to index tokens (NSE_CM) for LTP and optionally NFO option tokens (NSE_FO) for real-time option LTP.
+LTP mode (1) provides last_traded_price; Quote mode (2) and SnapQuote (3) provide bid/ask/depth/OHLC—use same
+token_list with mode 2 or 3 for full option data when needed. Greeks are via REST only (broker.get_option_greeks).
 Run start() after broker.connect(); use get_ltp(token) for real-time LTP from cache.
 """
 import threading
 import time
-from typing import Dict, Optional, Any
+from typing import Dict, List, Optional, Any
 from loguru import logger
 
 try:
@@ -49,8 +51,8 @@ class AngelOneFeed:
         self._running = False
         self._correlation_id = "feed001"
 
-    def start(self, broker: Any) -> bool:
-        """Start WebSocket and subscribe to index tokens. broker must be connected."""
+    def start(self, broker: Any, nfo_tokens: Optional[List[str]] = None) -> bool:
+        """Start WebSocket and subscribe to index tokens and optionally NFO option tokens. broker must be connected."""
         if self._running:
             _step("broker", "feed", "already running")
             return True
@@ -67,6 +69,10 @@ class AngelOneFeed:
             logger.warning("[broker] feed: SmartWebSocketV2 not found; skip WebSocket")
             return False
 
+        # NSE_FO = 2 for NFO (F&O) segment
+        NSE_FO = getattr(SmartWebSocketV2, "NSE_FO", 2)
+        LTP_MODE = getattr(SmartWebSocketV2, "LTP_MODE", 1)
+
         self._running = True
         self.ws = SmartWebSocketV2(
             auth_token=auth_token,
@@ -77,12 +83,18 @@ class AngelOneFeed:
             retry_delay=5,
         )
 
+        # Collect NFO tokens to subscribe (limit 200 to stay under 1000 total)
+        nfo_sub = []
+        if nfo_tokens:
+            nfo_sub = [str(t).strip() for t in nfo_tokens if t][:200]
+
         def on_data(wsapp, data: dict):
             token = (data.get("token") or "").strip()
             ltp_val = data.get("last_traded_price")
             if token and ltp_val is not None:
                 try:
-                    ltp = float(ltp_val)
+                    # SmartAPI WebSocket2: prices in paise (divide by 100 for rupees)
+                    ltp = float(ltp_val) / 100.0
                     with _cache_lock:
                         _ltp_cache[token] = ltp
                     logger.debug("[broker] feed LTP update token=%s ltp=%s", token, ltp)
@@ -90,12 +102,15 @@ class AngelOneFeed:
                     logger.debug("[broker] feed LTP parse skip token=%s value=%s err=%s", token, ltp_val, e)
 
         def on_open(wsapp):
-            tokens_sub = list(INDEX_TOKENS.keys())
-            logger.info("[broker] feed WebSocket connected, subscribing index tokens: %s", tokens_sub)
-            _step("broker", "feed", "WebSocket connected, subscribing index tokens", tokens=tokens_sub)
-            token_list = [{"exchangeType": SmartWebSocketV2.NSE_CM, "tokens": tokens_sub}]
+            token_list = [{"exchangeType": SmartWebSocketV2.NSE_CM, "tokens": list(INDEX_TOKENS.keys())}]
+            if nfo_sub:
+                token_list.append({"exchangeType": NSE_FO, "tokens": nfo_sub})
+                logger.info("[broker] feed WebSocket connected, subscribing index + NFO option tokens (NFO count=%s)", len(nfo_sub))
+            else:
+                logger.info("[broker] feed WebSocket connected, subscribing index tokens: %s", list(INDEX_TOKENS.keys()))
+            _step("broker", "feed", "WebSocket connected, subscribing", index_tokens=len(INDEX_TOKENS), nfo_tokens=len(nfo_sub))
             try:
-                self.ws.subscribe(self._correlation_id, SmartWebSocketV2.LTP_MODE, token_list)
+                self.ws.subscribe(self._correlation_id, LTP_MODE, token_list)
                 logger.debug("[broker] feed subscribe sent correlation_id=%s mode=LTP", self._correlation_id)
             except Exception as e:
                 logger.exception("[broker] feed subscribe error: %s", e)

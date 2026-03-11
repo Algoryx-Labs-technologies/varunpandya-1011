@@ -12,6 +12,7 @@ from loguru import logger
 import json
 from datetime import datetime
 from config import Config
+import requests
 try:
     from utils.logging_config import step_log as _step
 except ImportError:
@@ -30,13 +31,23 @@ def _totp_code(secret: str) -> str:
 
 
 class AngelOneBroker:
-    """Wrapper class for Angel One SmartAPI"""
+    """Wrapper class for Angel One SmartAPI. Optional use_market_feed=True uses ANGEL_ONE_MARKET_FEED_* credentials for data only."""
 
-    def __init__(self):
-        self.api_key = Config.ANGEL_ONE_API_KEY
-        self.client_id = Config.ANGEL_ONE_CLIENT_ID
-        self.password = Config.ANGEL_ONE_PASSWORD
-        self.totp_secret = Config.ANGEL_ONE_TOTP_SECRET
+    def __init__(self, use_market_feed: bool = False):
+        if use_market_feed and getattr(Config, "USE_MARKET_FEED", False):
+            self.api_key = getattr(Config, "ANGEL_ONE_MARKET_FEED_API_KEY", "") or ""
+            self.client_id = getattr(Config, "ANGEL_ONE_MARKET_FEED_CLIENT_ID", "") or ""
+            self.password = getattr(Config, "ANGEL_ONE_MARKET_FEED_PASSWORD", "") or ""
+            self.totp_secret = getattr(Config, "ANGEL_ONE_MARKET_FEED_TOTP_SECRET", "") or ""
+            self._mpin = getattr(Config, "ANGEL_ONE_MARKET_FEED_MPIN", "") or ""
+            self._use_market_feed = True
+        else:
+            self.api_key = Config.ANGEL_ONE_API_KEY
+            self.client_id = Config.ANGEL_ONE_CLIENT_ID
+            self.password = Config.ANGEL_ONE_PASSWORD
+            self.totp_secret = Config.ANGEL_ONE_TOTP_SECRET
+            self._mpin = getattr(Config, "ANGEL_ONE_MPIN", None) or ""
+            self._use_market_feed = False
         self.obj = None
         self.feed_token = None
         self.jwt_token = None
@@ -47,21 +58,21 @@ class AngelOneBroker:
         """Authenticate with Angel One API per SmartAPI: clientcode, password (pin), totp. Session active till midnight."""
         self.last_error = None
         try:
-            key_secret = getattr(Config, "KEY_SECRET", None) or (self.api_key, "", self.client_id, self.password, self.totp_secret or "")
-            api_key = (key_secret[0] or "").strip()
-            client_code = (key_secret[2] or "").strip()
-            totp_secret = (key_secret[4] or "").strip()
+            api_key = (self.api_key or "").strip()
+            client_code = (self.client_id or "").strip()
+            totp_secret = (self.totp_secret or "").strip()
+            login_pin = (self._mpin or "").strip() or (self.password or "").strip()
             if not api_key or not client_code or not totp_secret:
                 self.last_error = ("Missing api_key, client_code or totp_secret", "")
-                logger.error("Missing credentials in .env: ANGEL_ONE_API_KEY, ANGEL_ONE_CLIENT_ID, ANGEL_ONE_TOTP_SECRET")
+                logger.error("Missing credentials in .env: ANGEL_ONE_API_KEY, ANGEL_ONE_CLIENT_ID, ANGEL_ONE_TOTP_SECRET" + (" (or ANGEL_ONE_MARKET_FEED_* for market feed)" if self._use_market_feed else ""))
                 return False
-            login_pin = (getattr(Config, "ANGEL_ONE_MPIN", None) or "").strip() or (key_secret[3] or "").strip()
             if not login_pin:
                 self.last_error = ("Missing password/mPIN", "")
-                logger.error("Set ANGEL_ONE_PASSWORD or ANGEL_ONE_MPIN in .env")
+                logger.error("Set ANGEL_ONE_PASSWORD or ANGEL_ONE_MPIN in .env" + (" or ANGEL_ONE_MARKET_FEED_* for market feed" if self._use_market_feed else ""))
                 return False
-            auth_type = "MPIN" if (getattr(Config, "ANGEL_ONE_MPIN", None) or "").strip() else "password"
-            logger.info(f"Angel One login attempt (client_code={client_code}, auth={auth_type})")
+            auth_type = "MPIN" if (self._mpin or "").strip() else "password"
+            feed_label = " [market feed]" if self._use_market_feed else ""
+            logger.info(f"Angel One login attempt (client_code={client_code}, auth={auth_type}){feed_label}")
             self.obj = SmartConnect(api_key=api_key)
             for attempt in range(3):
                 totp_code = _totp_code(totp_secret)
@@ -132,7 +143,8 @@ class AngelOneBroker:
         token: str,
         quantity: int,
         price: float,
-        order_type: str = "LIMIT"
+        order_type: str = "LIMIT",
+        exchange: Optional[str] = None,
     ) -> Optional[Dict]:
         """
         Place a buy order
@@ -143,17 +155,19 @@ class AngelOneBroker:
             quantity: Number of lots/contracts
             price: Limit price
             order_type: Order type (LIMIT/MARKET)
+            exchange: NSE or NFO; default from Config.EXCHANGE (use NFO for options)
         """
         if not self.obj:
             logger.error("place_buy_order: broker not connected")
             return None
+        exch = (exchange or "").strip().upper() or getattr(Config, "EXCHANGE", "NSE")
         try:
             order_params = {
                 "variety": Config.VARIETY,
                 "tradingsymbol": symbol,
                 "symboltoken": token,
                 "transactiontype": "BUY",
-                "exchange": Config.EXCHANGE,
+                "exchange": exch,
                 "ordertype": order_type,
                 "producttype": Config.PRODUCT_TYPE,
                 "duration": Config.ORDER_DURATION,
@@ -177,7 +191,8 @@ class AngelOneBroker:
         token: str,
         quantity: int,
         price: float,
-        order_type: str = "LIMIT"
+        order_type: str = "LIMIT",
+        exchange: Optional[str] = None,
     ) -> Optional[Dict]:
         """
         Place a sell order
@@ -188,17 +203,19 @@ class AngelOneBroker:
             quantity: Number of lots/contracts
             price: Limit price
             order_type: Order type (LIMIT/MARKET)
+            exchange: NSE or NFO; default from Config.EXCHANGE (use NFO for options)
         """
         if not self.obj:
             logger.error("place_sell_order: broker not connected")
             return None
+        exch = (exchange or "").strip().upper() or getattr(Config, "EXCHANGE", "NSE")
         try:
             order_params = {
                 "variety": Config.VARIETY,
                 "tradingsymbol": symbol,
                 "symboltoken": token,
                 "transactiontype": "SELL",
-                "exchange": Config.EXCHANGE,
+                "exchange": exch,
                 "ordertype": order_type,
                 "producttype": Config.PRODUCT_TYPE,
                 "duration": Config.ORDER_DURATION,
@@ -334,6 +351,56 @@ class AngelOneBroker:
             logger.exception("Error getting historical data: %s", e)
             _step("broker", "get_historical_data", "error", error=str(e))
             return None
+
+    OPTION_GREEKS_URL = "https://apiconnect.angelone.in/rest/secure/angelbroking/marketData/v1/optionGreek"
+
+    def get_option_greeks(self, name: str, expirydate: str) -> Optional[List[Dict]]:
+        """
+        Fetch option Greeks (delta, gamma, theta, vega, IV) from Angel One REST API.
+        Available for live contracts during market hours only.
+        name: Underlying symbol (e.g. NIFTY, BANKNIFTY, TCS).
+        expirydate: DDMMMYYYY (e.g. 08FEB2024).
+        Returns list of dicts with strikePrice, optionType (CE/PE), delta, gamma, theta, vega, impliedVolatility, tradeVolume.
+        """
+        if not self.obj or not self.jwt_token:
+            logger.debug("get_option_greeks: broker not connected")
+            return None
+        name = (name or "").strip().upper()
+        expirydate = (expirydate or "").strip()
+        if not name or not expirydate:
+            logger.warning("get_option_greeks: name and expirydate required")
+            return None
+        try:
+            headers = {
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+                "Authorization": "Bearer " + (self.jwt_token or ""),
+                "X-PrivateKey": (self.api_key or ""),
+                "X-UserType": "USER",
+                "X-SourceID": "WEB",
+            }
+            payload = {"name": name, "expirydate": expirydate}
+            _step("broker", "get_option_greeks", "request", name=name, expirydate=expirydate)
+            resp = requests.post(
+                self.OPTION_GREEKS_URL,
+                json=payload,
+                headers=headers,
+                timeout=15,
+            )
+            try:
+                data = resp.json() if resp.content else {}
+            except (ValueError, TypeError):
+                data = {}
+            if data.get("status") and data.get("data"):
+                out = data["data"] if isinstance(data["data"], list) else []
+                _step("broker", "get_option_greeks", "OK", rows=len(out))
+                return out
+            _step("broker", "get_option_greeks", "no data", message=data.get("message"))
+            return []
+        except Exception as e:
+            logger.exception("Error getting option Greeks: %s", e)
+            _step("broker", "get_option_greeks", "error", error=str(e))
+            return None
     
     def cancel_all(self) -> int:
         """
@@ -376,14 +443,15 @@ class AngelOneBroker:
                 quantity = int(position.get("netqty", 0))
                 if quantity == 0:
                     continue
-                ltp = self.get_ltp(exchange, str(token), position.get("tradingsymbol")) if token else None
+                pos_exchange = (position.get("exchange") or "").strip().upper() or exchange
+                ltp = self.get_ltp(pos_exchange, str(token), position.get("tradingsymbol")) if token else None
                 if ltp is None or float(ltp) <= 0:
                     logger.warning(f"squareoff: no LTP for {symbol}, skip")
                     continue
                 if quantity > 0:
-                    self.place_sell_order(symbol, str(token), abs(quantity), float(ltp) * 0.99, "LIMIT")
+                    self.place_sell_order(symbol, str(token), abs(quantity), float(ltp) * 0.99, "LIMIT", exchange=pos_exchange)
                 else:
-                    self.place_buy_order(symbol, str(token), abs(quantity), float(ltp) * 1.01, "LIMIT")
+                    self.place_buy_order(symbol, str(token), abs(quantity), float(ltp) * 1.01, "LIMIT", exchange=pos_exchange)
                 squared += 1
                 logger.info(f"Squared off {symbol} qty={quantity} at ~{ltp}")
             if wait_seconds > 0:

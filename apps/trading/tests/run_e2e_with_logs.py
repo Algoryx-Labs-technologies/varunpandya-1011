@@ -8,9 +8,19 @@ Run from apps/trading: python tests/run_e2e_with_logs.py   or   venv\Scripts\pyt
 import sys
 from pathlib import Path
 from datetime import datetime
+from unittest.mock import MagicMock
 
 APP_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(APP_ROOT))
+
+# Allow run without Angel One SmartApi SDK
+try:
+    __import__("SmartApi")
+except ModuleNotFoundError:
+    sys.modules["SmartApi"] = MagicMock()
+    sys.modules["SmartApi"].SmartConnect = MagicMock()
+    sys.modules["SmartApi.smartWebSocketV2"] = MagicMock()
+    sys.modules["SmartApi.smartWebSocketV2"].SmartWebSocketV2 = MagicMock()
 
 # Log dir and cleanup previous logs so only this run's logs are "recent"
 LOG_DIR = APP_ROOT / "logs"

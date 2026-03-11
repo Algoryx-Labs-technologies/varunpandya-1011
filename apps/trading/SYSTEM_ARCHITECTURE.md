@@ -6,30 +6,34 @@ Production-grade, institutional-level intraday options trading system for Nifty/
 
 ## Architecture Components
 
-### 1. Broker Wrapper (`broker/angel_one.py`)
+### 1. Broker Wrapper (`broker/angel_one.py`) and instruments (`broker/instruments.py`)
 - **SmartAPI Integration**: Full wrapper around Angel One SmartAPI
-- **Credentials**: Loaded from `.env` only (ANGEL_ONE_*)
+- **Credentials**: Loaded from `.env` only (ANGEL_ONE_*). Optional **market feed** credentials: when `ANGEL_ONE_MARKET_FEED_API_KEY` and `ANGEL_ONE_MARKET_FEED_CLIENT_ID` are set, `AngelOneBroker(use_market_feed=True)` uses these for data/WebSocket only; orders/positions/risk use the main broker.
 - **Methods**:
   - `connect()` - Authenticate with TOTP
-  - `place_buy_order()` / `place_sell_order()` - Order placement
+  - `place_buy_order()` / `place_sell_order()` - Order placement (exchange NSE/NFO; use NFO for options)
   - `cancel_order()` / `cancel_all()` - Order cancellation
   - `get_all_open_orders()` - List of pending orders; `get_all_open_orders_as_df()` - Same as DataFrame (when pandas available)
   - `get_position()` / `get_tradebook()` - Position and trade data
-  - `get_ltp()` - Last traded price
-  - `get_historical_data()` - OHLC data fetching
-  - `squareoff(exchange, wait_seconds=30)` - Cancel all orders, square all positions at LTP, wait, log positions (used by kill switch)
+  - `get_ltp()` - Last traded price (NSE or NFO)
+  - `get_historical_data()` - OHLC (index or NFO options)
+  - `get_option_greeks(name, expirydate)` - Option Greeks (delta, gamma, theta, vega, IV) via REST; live contracts only
+  - `squareoff(exchange, wait_seconds=30)` - Cancel all orders, square all positions at LTP (per-position exchange for NFO), wait, log positions (used by kill switch)
+- **Instruments** (`broker/instruments.py`): Scrip Master → NFO symbol → token; used for option orders and WebSocket option subscription.
+
+**Main vs data broker (`main.py`):** The bot keeps a **trading broker** (orders, positions, risk) and, when `USE_MARKET_FEED` is true, a separate **data broker** (OHLC, option chain, Greeks, WebSocket). If the market-feed broker fails to connect, the data fetcher and WebSocket fall back to the trading broker.
 
 ### 2. Data Engine (`data/data_fetcher.py`)
 - **Multi-timeframe Support**: 1m, 5m, 15m
 - **Multi-index Support**: NIFTY, BANKNIFTY, FINNIFTY
-- **Data Sources** (real-time / NSE only, no yfinance):
-  - Angel One API: OHLC (historical/intraday)
-  - NSE API: option chain only (real-time)
+- **Data Sources** (real-time / NSE + Angel One, no yfinance):
+  - Angel One API: OHLC (historical/intraday), option Greeks (REST), option LTP/historical (NFO)
+  - NSE API: option chain (real-time); expiry parsed from symbols for Greeks request
 - **Features**:
-  - Historical data from market open (9:15)
-  - Live updates with caching
-  - Option chain real-time fetching
-  - Vectorized pandas DataFrames
+  - Historical data from market open (9:15); option historical OHLC via broker (NFO); saved under `data/historical/index_ohlc/{index}/{timeframe}/ohlc.csv`
+  - Option chain: NSE + LTP enrichment from Angel One WebSocket/broker; **Greeks merge** (delta, gamma, theta, vega, iv) from Angel One REST when available
+  - Live updates with caching; vectorized pandas DataFrames
+  - **Data broker**: When `USE_MARKET_FEED` is set, `DataFetcher` is constructed with the market-feed broker instance for all OHLC/Greeks/chain; otherwise uses the trading broker
 
 ### 3. Level Engine (`levels/level_manager.py`)
 
@@ -101,13 +105,17 @@ Production-grade, institutional-level intraday options trading system for Nifty/
   - **Time-based square off**: After target candles (`CANDLES_BEFORE_SQUARE_OFF`, e.g. 7 or 10), exit at market if still in trade.
 
 ### 6. Strike Selection Engine (`money/position_sizing.py`)
-- **Optimal allocation on strike prices based on highest historical return**: Selection uses a **historical return score** = utilization × ATM weight (ATM = 1.0, ITM/OTM = 0.9) so that the chosen strike maximizes participation and favors ATM (highest delta/return potential).
+- **Optimal allocation on strike prices**: Selection uses a **historical return score** = utilization × ATM weight (ATM = 1.0, ITM/OTM = 0.9) when `STRIKE_PREFERENCE=best_return`.
+- **Greeks-based selection** (when option chain has delta/theta/iv from Angel One):
+  - `greeks_delta`: Prefer strike with delta nearest `GREEKS_DELTA_TARGET` (calls default 0.4, puts 0.6).
+  - `greeks_theta`: Prefer lower absolute theta (less time decay cost for long options).
+  - `greeks_iv`: Prefer lower implied volatility (cheaper premium).
 - **User daily strikes** (optional): Set `DAILY_STRIKES_NIFTY`, `DAILY_STRIKES_BANKNIFTY`, `DAILY_STRIKES_FINNIFTY` (comma-separated); when set, only these strikes are considered.
 - **Auto from option chain**: Otherwise uses full/ATM window from live option chain.
 - **Selection Logic**:
-  - Preference: `best_return` (highest historical return proxy) | `atm` | `itm` | `otm` (`STRIKE_PREFERENCE`)
+  - Preference: `best_return` | `atm` | `itm` | `otm` | `greeks_delta` | `greeks_theta` | `greeks_iv` (`STRIKE_PREFERENCE`)
   - Compute quantity: `qty = floor(allocation / price)` per lot size
-  - Rank by historical_return_score (utilization × atm_weight), then capital_used
+  - Rank by historical_return_score (or Greeks score when preference is greeks_*), then capital_used
   - Vectorized selection
 
 ### 7. Risk Engine (`risk/risk_manager.py`)
@@ -203,14 +211,29 @@ Backend API (Node.js)
 Frontend (React)
 ```
 
+## Real-time feed (SmartAPI WebSocket2)
+
+- **Module**: `broker/feed_websocket.py`
+- **URL**: `wss://smartapisocket.angelone.in/smart-stream` (per [SmartAPI WebSocket2](https://smartapi.angelbroking.com/docs/WebSocket2))
+- **Auth**: JWT, api_key, client_code, feed_token (from broker login)
+- **Subscription**: LTP mode (1); token list: NSE_CM (index tokens) + NSE_FO (NFO option tokens when option chain is available at startup)
+- **LTP**: Binary response prices are in **paise**; the feed converts to **rupees** (÷100) before caching. `get_ltp_from_feed(token)` returns cached LTP in rupees.
+- **Start**: `AngelOneFeed().start(broker, nfo_tokens=...)` after broker connect; `main.py` optionally fetches option chain and passes NFO tokens for option LTP subscription.
+
 ## Key Files
 
-- `main.py` - Main orchestrator
-- `config.py` - Configuration (from .env only)
+- `main.py` - Main orchestrator (trading broker + optional data broker, WebSocket with index + NFO)
+- `config.py` - Configuration (from .env only; includes USE_MARKET_FEED, ANGEL_ONE_MARKET_FEED_*)
+- `run_system_test.py` - Full system test (config → broker → data flow → backend)
+- `run_data_system_test.py` - Data path test (OHLC, option chain, WebSocket LTP)
+- `run_market_feed_data_test.py` - Market-feed broker data test (when USE_MARKET_FEED set)
 
-## Testing (real historical data)
+## Testing (real historical data and data system)
 
-Tests run on **real historical OHLC** that has been fetched and saved under `data/historical/index_ohlc/`. Run `python tests/run_e2e_with_logs.py` once to fetch and save data; then `pytest tests/ -v` uses this data for indicators, levels, patterns, ML, and E2E flow tests. When no historical data exists, tests fall back to synthetic dummy data or skip (see `tests/README.md` and `conftest.py` fixtures `historical_ohlc_df`, `real_ohlc_df`).
+- **Historical OHLC**: Tests use data under `data/historical/index_ohlc/`. Run `python tests/run_e2e_with_logs.py` once to fetch and save; then `pytest tests/ -v` uses it for indicators, levels, patterns, ML, E2E. See `tests/README.md` and `conftest.py` fixtures `historical_ohlc_df`, `real_ohlc_df`.
+- **System test**: `py -3 run_system_test.py` — config, indicators, patterns, levels, strike selection, ML, data fetcher, broker connect, live data flow (OHLC, option chain), backend health.
+- **Data system test**: `py -3 run_data_system_test.py` — trading broker only; OHLC, option chain, WebSocket LTP (indices); verifies LTP in rupees.
+- **Market feed data test**: `py -3 run_market_feed_data_test.py` — uses market-feed broker when `USE_MARKET_FEED` is set; requires `ANGEL_ONE_MARKET_FEED_*` in `.env`.
 
 ## Performance Requirements
 

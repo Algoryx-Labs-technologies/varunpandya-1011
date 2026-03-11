@@ -7,10 +7,20 @@ Run from apps/trading: python run_system_test.py   or   venv\Scripts\python run_
 import sys
 from pathlib import Path
 from datetime import datetime
+from unittest.mock import MagicMock
 
 # Ensure app root is on path
 APP_ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(APP_ROOT))
+
+# Allow run without Angel One SmartApi SDK (mock so broker module imports)
+try:
+    __import__("SmartApi")
+except ModuleNotFoundError:
+    sys.modules["SmartApi"] = MagicMock()
+    sys.modules["SmartApi"].SmartConnect = MagicMock()
+    sys.modules["SmartApi.smartWebSocketV2"] = MagicMock()
+    sys.modules["SmartApi.smartWebSocketV2"].SmartWebSocketV2 = MagicMock()
 
 # Log dir: cleanup previous logs so only this run's logs are recent
 LOG_DIR = APP_ROOT / "logs"
@@ -59,6 +69,8 @@ def test_config() -> None:
     log.info("TRADING_CAPITAL = %s", Config.TRADING_CAPITAL)
     log.info("NIFTY_ALLOCATION = %s", Config.NIFTY_ALLOCATION)
     log.info("STRIKE_PREFERENCE = %s", Config.STRIKE_PREFERENCE)
+    log.info("GREEKS_DELTA_TARGET = %s", getattr(Config, "GREEKS_DELTA_TARGET", None))
+    log.info("EXCHANGE_NFO = %s", getattr(Config, "EXCHANGE_NFO", "NFO"))
     log.info("INDEX_SYMBOLS = %s", list(Config.INDEX_SYMBOLS.keys()))
     log.info("TIMEFRAMES = %s", Config.TIMEFRAMES)
     for idx in ["NIFTY", "BANKNIFTY"]:

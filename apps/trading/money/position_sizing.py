@@ -13,7 +13,8 @@ from loguru import logger
 from config import Config
 
 VALID_INDICES = frozenset(getattr(Config, "INDEX_SYMBOLS", {}).keys() or {"NIFTY", "BANKNIFTY", "FINNIFTY"})
-VALID_PREFERENCE = ("best_return", "atm", "itm", "otm")
+VALID_PREFERENCE = ("best_return", "atm", "itm", "otm", "greeks_delta", "greeks_theta", "greeks_iv")
+GREEKS_PREFERENCES = ("greeks_delta", "greeks_theta", "greeks_iv")
 
 
 def _safe_float(v: Any, default: float) -> float:
@@ -246,6 +247,90 @@ class PositionSizer:
         }
         logger.info("Daily capital reset")
 
+    def select_strike_with_greeks(
+        self,
+        option_chain: Dict[str, Any],
+        index: str,
+        direction: str,
+        preference: str = "greeks_delta",
+        max_strikes: int = 20,
+        allowed_strikes: Optional[List[float]] = None,
+    ) -> Optional[Tuple[float, int, float, str, str]]:
+        """
+        Select strike using Greeks from Angel One (delta, theta, or IV).
+        greeks_delta: prefer delta nearest to GREEKS_DELTA_TARGET (calls ~0.4, puts ~0.6).
+        greeks_theta: prefer lower abs(theta) to reduce time decay cost for long options.
+        greeks_iv: prefer lower implied volatility (cheaper premium) for long options.
+        Returns (strike, quantity, capital_used, moneyness, symbol) or None.
+        """
+        if not option_chain or preference not in GREEKS_PREFERENCES:
+            return None
+        underlying = option_chain.get("underlying_value") or option_chain.get("underlyingValue")
+        if not underlying or underlying <= 0:
+            return None
+        df = option_chain.get("calls") if direction == "call" else option_chain.get("puts")
+        if df is None or not hasattr(df, "columns") or "strike" not in df.columns or "ltp" not in df.columns or "delta" not in df.columns:
+            return None
+        if preference == "greeks_theta" and "theta" not in df.columns:
+            return None
+        if preference == "greeks_iv" and "iv" not in df.columns:
+            return None
+        available_capital = _safe_float(self.allocations.get(index, 0), 0)
+        if available_capital <= 0:
+            return None
+        lot_size = max(1, int(self.lot_sizes.get(index, 50) or 50))
+        option_type = "call" if (str(direction or "").strip().lower() == "call") else "put"
+        # Filter and trim
+        df = df.copy()
+        df["strike"] = pd.to_numeric(df["strike"], errors="coerce").fillna(0)
+        df["ltp"] = pd.to_numeric(df["ltp"], errors="coerce").fillna(0)
+        df = df[(df["strike"] > 0) & (df["ltp"] > 0)]
+        if allowed_strikes:
+            allowed_set = set(float(s) for s in allowed_strikes)
+            df = df[df["strike"].apply(lambda s: any(abs(s - a) < 0.5 for a in allowed_set))]
+        if df.empty:
+            return None
+        if len(df) > max_strikes:
+            mid = len(df) // 2
+            half = max_strikes // 2
+            df = df.iloc[mid - half : mid + half]
+        # Quantity and capital
+        df["qty"] = (available_capital / df["ltp"]).astype(int) // lot_size * lot_size
+        df = df[df["qty"] >= lot_size]
+        if df.empty:
+            return None
+        df["capital_used"] = df["qty"] * df["ltp"]
+        df["moneyness"] = df.apply(
+            lambda r: _moneyness(float(underlying), float(r["strike"]), option_type), axis=1
+        )
+        # Greeks columns (may be NaN if API had no data)
+        delta_col = pd.to_numeric(df["delta"], errors="coerce")
+        theta_col = pd.to_numeric(df["theta"], errors="coerce") if "theta" in df.columns else pd.Series(dtype=float)
+        iv_col = pd.to_numeric(df["iv"], errors="coerce") if "iv" in df.columns else pd.Series(dtype=float)
+        target_delta = _safe_float(getattr(Config, "GREEKS_DELTA_TARGET", 0.4), 0.4)
+        if option_type == "put":
+            target_delta = 1.0 - target_delta  # put delta target e.g. 0.6
+        if preference == "greeks_delta":
+            df["score"] = -(delta_col - target_delta).abs()
+        elif preference == "greeks_theta":
+            df["score"] = -theta_col.abs()  # less negative = better for long
+        else:  # greeks_iv
+            df["score"] = -iv_col.fillna(1e9)  # lower IV better
+        df = df.dropna(subset=["score"])
+        if df.empty or df["score"].isna().all():
+            return None
+        row = df.loc[df["score"].idxmax()]
+        strike = float(row["strike"])
+        qty = int(row["qty"])
+        capital_used = float(row["capital_used"])
+        moneyness = str(row["moneyness"])
+        symbol = str(row.get("symbol", "")) if "symbol" in df.columns else ""
+        logger.info(
+            "Strike selected (Greeks %s): %s (%s) qty=%s capital_used=%.2f delta=%s",
+            preference, strike, moneyness.upper(), qty, capital_used, row.get("delta"),
+        )
+        return (strike, qty, capital_used, moneyness, symbol)
+
     def select_strike_from_option_chain(
         self,
         option_chain: Dict[str, Any],
@@ -256,7 +341,7 @@ class PositionSizer:
         allowed_strikes: Optional[List[float]] = None,
     ) -> Optional[Tuple[float, int, float, str, str]]:
         """
-        Choose strike with best return from real-time option chain data.
+        Choose strike from option chain: by best return, moneyness (atm/itm/otm), or Greeks (delta/theta/iv).
         If allowed_strikes is set (e.g. user daily list), only those strikes are considered.
         Returns: (strike, quantity, capital_used, moneyness, symbol) or None.
         """
@@ -290,6 +375,17 @@ class PositionSizer:
             prices = [float(x.get("ltp", 0)) for x in df]
             symbols = [x.get("symbol", "") for x in df] if isinstance(df, list) else []
 
+        pref = (preference or self.strike_preference or "best_return").strip().lower()
+        if pref in GREEKS_PREFERENCES and isinstance(df, pd.DataFrame) and "delta" in df.columns:
+            result = self.select_strike_with_greeks(
+                option_chain, index, direction, preference=pref,
+                max_strikes=max_strikes, allowed_strikes=allowed_strikes,
+            )
+            if result:
+                return result
+            # Fallback to best_return if Greeks selection returns None
+            pref = "best_return"
+
         # User-provided daily strike list: keep only those strikes (tolerance 0.5 for float)
         if allowed_strikes and len(allowed_strikes) > 0:
             allowed_set = set(float(s) for s in allowed_strikes)
@@ -314,7 +410,7 @@ class PositionSizer:
             prices,
             index,
             direction,
-            preference=preference or self.strike_preference,
+            preference=pref,
         )
         if not result:
             return None

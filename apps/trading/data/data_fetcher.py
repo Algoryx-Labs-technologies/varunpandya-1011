@@ -46,6 +46,30 @@ def _get_nse_retries() -> int:
         return 2
 
 
+def _expiry_from_nse_symbol(symbol: str, index: str) -> Optional[str]:
+    """
+    Parse expiry from NSE option identifier (e.g. NIFTY08FEB2424500CE -> 08FEB2024).
+    Index is used to know prefix length (NIFTY=5, BANKNIFTY=10, FINNIFTY=9).
+    """
+    if not symbol or not isinstance(symbol, str):
+        return None
+    symbol = symbol.strip().upper()
+    prefix = (index or "NIFTY").strip().upper()
+    if not symbol.startswith(prefix):
+        return None
+    # DDMMMYY is 7 chars after prefix (e.g. 08FEB24)
+    start = len(prefix)
+    if start + 7 > len(symbol):
+        return None
+    ddmmmyy = symbol[start : start + 7]
+    try:
+        yy = int(ddmmmyy[-2:])
+        year = 2000 + yy if yy < 50 else 1900 + yy
+        return ddmmmyy[:-2] + str(year)  # 08FEB24 -> 08FEB2024
+    except (ValueError, TypeError):
+        return None
+
+
 class DataFetcher:
     """Handles data acquisition: broker (OHLC), NSE (option chain only)."""
     
@@ -279,11 +303,178 @@ class DataFetcher:
                 "puts": puts_df,
                 "underlying_value": underlying,
             }
+            # Enrich LTP from Angel One WebSocket/broker when available (real-time option data)
+            try:
+                self._enrich_option_chain_ltp_from_broker(result)
+            except Exception as e:
+                logger.debug("[data] option_chain LTP enrichment skipped: %s", e)
+            # Enrich Greeks from Angel One REST (delta, gamma, theta, vega, iv) when available
+            try:
+                self._enrich_option_chain_greeks(result)
+            except Exception as e:
+                logger.debug("[data] option_chain Greeks enrichment skipped: %s", e)
             log_module("data_fetcher", "fetch_option_chain", f"OK calls={len(calls_df)} puts={len(puts_df)}", index=index)
             _step("data", "fetch_option_chain", "OK", index=index, calls=len(calls_df), puts=len(puts_df), underlying=underlying)
             return result
         except Exception as e:
             logger.exception("fetch_option_chain parse error: %s", e)
+            return None
+
+    def _enrich_option_chain_ltp_from_broker(self, chain: Dict, max_enrich: int = 20) -> None:
+        """
+        Overwrite option chain LTP from Angel One WebSocket cache or broker LTP (NFO) when available.
+        Limits to first max_enrich calls and first max_enrich puts to avoid rate limits.
+        """
+        if not chain or not self.broker.obj:
+            return
+        exchange_nfo = getattr(Config, "EXCHANGE_NFO", "NFO")
+        try:
+            from broker.feed_websocket import get_ltp_from_feed
+            from broker.instruments import get_option_token
+        except ImportError:
+            return
+        for key in ("calls", "puts"):
+            df = chain.get(key)
+            if df is None or not hasattr(df, "iloc") or df.empty or "symbol" not in df.columns or "ltp" not in df.columns:
+                continue
+            n = min(max_enrich, len(df))
+            updated = 0
+            for i in range(n):
+                sym = (df.iloc[i].get("symbol") if hasattr(df.iloc[i], "get") else None) or ""
+                if not sym or not isinstance(sym, str):
+                    continue
+                token = get_option_token(sym, refresh_if_missing=False)
+                if not token:
+                    continue
+                ltp = get_ltp_from_feed(token)
+                if ltp is None or ltp <= 0:
+                    ltp = self.broker.get_ltp(exchange_nfo, token, sym)
+                if ltp is not None and ltp > 0:
+                    df.at[df.index[i], "ltp"] = float(ltp)
+                    updated += 1
+            if updated:
+                logger.debug("[data] option_chain enriched %s %s LTP from broker/feed count=%s", key, chain.get("index"), updated)
+
+    def _enrich_option_chain_greeks(self, chain: Dict) -> None:
+        """
+        Merge Angel One option Greeks (delta, gamma, theta, vega, iv) into option chain by strike and CE/PE.
+        Greeks API is live-only; no-op if broker not connected or API returns no data.
+        """
+        if not chain or not self.broker.obj:
+            return
+        index = (chain.get("index") or "").strip().upper()
+        if index not in VALID_INDICES:
+            return
+        expiry = None
+        for key in ("calls", "puts"):
+            df = chain.get(key)
+            if df is not None and not df.empty and "symbol" in df.columns:
+                first_sym = df.iloc[0].get("symbol") if hasattr(df.iloc[0], "get") else None
+                if first_sym:
+                    expiry = _expiry_from_nse_symbol(str(first_sym), index)
+                    break
+        if not expiry:
+            return
+        greeks_list = self.broker.get_option_greeks(index, expiry)
+        if not greeks_list:
+            return
+        # Build (strike, optionType) -> greeks dict
+        def _f(v, default=0.0):
+            try:
+                return float(v) if v is not None else default
+            except (TypeError, ValueError):
+                return default
+        greeks_by_strike_type: Dict[Tuple[float, str], Dict] = {}
+        for g in greeks_list:
+            if not isinstance(g, dict):
+                continue
+            strike = _f(g.get("strikePrice"))
+            opt = (g.get("optionType") or "").strip().upper()
+            if strike <= 0 or opt not in ("CE", "PE"):
+                continue
+            greeks_by_strike_type[(strike, opt)] = {
+                "delta": _f(g.get("delta")),
+                "gamma": _f(g.get("gamma")),
+                "theta": _f(g.get("theta")),
+                "vega": _f(g.get("vega")),
+                "iv": _f(g.get("impliedVolatility")),
+            }
+        for key, opt_type in (("calls", "CE"), ("puts", "PE")):
+            df = chain.get(key)
+            if df is None or not hasattr(df, "columns") or "strike" not in df.columns:
+                continue
+            for col in ("delta", "gamma", "theta", "vega", "iv"):
+                if col not in df.columns:
+                    df[col] = np.nan
+            for i in range(len(df)):
+                try:
+                    strike = _f(df.iloc[i].get("strike") if hasattr(df.iloc[i], "get") else None)
+                    if strike <= 0:
+                        continue
+                    # Match with tolerance for float (e.g. 24100 vs 24100.0)
+                    g = None
+                    for (k_strike, k_type), v in greeks_by_strike_type.items():
+                        if k_type == opt_type and abs(k_strike - strike) < 0.01:
+                            g = v
+                            break
+                    if g:
+                        idx = df.index[i]
+                        df.at[idx, "delta"] = g["delta"]
+                        df.at[idx, "gamma"] = g["gamma"]
+                        df.at[idx, "theta"] = g["theta"]
+                        df.at[idx, "vega"] = g["vega"]
+                        df.at[idx, "iv"] = g["iv"]
+                except (KeyError, TypeError, ValueError) as e:
+                    logger.debug("[data] Greeks merge skip row i=%s: %s", i, e)
+                    continue
+            logger.debug("[data] option_chain Greeks enriched %s %s", key, chain.get("index"))
+
+    def fetch_option_historical(
+        self,
+        option_symbol: str,
+        option_token: str,
+        timeframe: str,
+        days_back: int = 1,
+    ) -> Optional[pd.DataFrame]:
+        """
+        Fetch historical OHLC for an NFO option from Angel One broker (getCandleData).
+        option_symbol: e.g. NIFTY25JAN29100CE; option_token from broker/instruments.
+        """
+        try:
+            timeframe = (timeframe or "1m").strip().lower()
+            if timeframe not in VALID_TIMEFRAMES:
+                return None
+            interval_map = {"1m": "ONE_MINUTE", "5m": "FIVE_MINUTE", "15m": "FIFTEEN_MINUTE"}
+            to_date = datetime.now()
+            from_date = to_date - timedelta(days=max(1, min(30, int(days_back or 1))))
+            from_str = from_date.strftime("%Y-%m-%d %H:%M")
+            to_str = to_date.strftime("%Y-%m-%d %H:%M")
+            exchange_nfo = getattr(Config, "EXCHANGE_NFO", "NFO")
+            data = self.broker.get_historical_data(
+                token=str(option_token),
+                exchange=exchange_nfo,
+                interval=interval_map.get(timeframe, "ONE_MINUTE"),
+                from_date=from_str,
+                to_date=to_str,
+                tradingsymbol=option_symbol,
+            )
+            if not data:
+                return None
+            df = pd.DataFrame(data)
+            if df.empty or len(df.columns) < 6:
+                return None
+            df.columns = ["timestamp", "open", "high", "low", "close", "volume"]
+            df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True, errors="coerce")
+            df = df.dropna(subset=["timestamp"])
+            for col in ["open", "high", "low", "close", "volume"]:
+                df[col] = pd.to_numeric(df[col], errors="coerce")
+            df = df.dropna(subset=["open", "high", "low", "close"])
+            df.set_index("timestamp", inplace=True)
+            df = df.sort_index()
+            _step("data", "fetch_option_historical", "OK", symbol=option_symbol, rows=len(df))
+            return df
+        except Exception as e:
+            logger.exception("fetch_option_historical failed: %s", e)
             return None
     
     def get_current_price(self, index: str) -> Optional[float]:

@@ -45,7 +45,10 @@ def test_e2e_tokens_and_tradingsymbols():
     reason="ANGEL_ONE_TOTP_SECRET not set",
 )
 def test_e2e_broker_connect():
-    """Broker connect succeeds when TOTP is set."""
+    """Broker connect succeeds when TOTP is set and real SmartApi is used."""
+    from unittest.mock import MagicMock
+    if isinstance(__import__("SmartApi").SmartConnect, MagicMock):
+        pytest.skip("SmartApi is mocked; use real SDK for broker connect test")
     from broker.angel_one import AngelOneBroker
     broker = AngelOneBroker()
     ok = broker.connect()
@@ -58,6 +61,9 @@ def test_e2e_broker_connect():
 )
 def test_e2e_data_flow_live():
     """Full data flow for one index: LTP, OHLC (1m), option chain. Requires broker connect."""
+    from unittest.mock import MagicMock
+    if isinstance(__import__("SmartApi").SmartConnect, MagicMock):
+        pytest.skip("SmartApi is mocked; use real SDK for live data flow test")
     from config import Config
     from broker.angel_one import AngelOneBroker
     from data.data_fetcher import DataFetcher

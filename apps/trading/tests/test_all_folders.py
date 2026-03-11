@@ -25,6 +25,15 @@ def test_broker_folder():
     assert hasattr(b, "connect")
     assert hasattr(b, "get_ltp")
     assert hasattr(b, "get_historical_data")
+    assert hasattr(b, "get_option_greeks")
+
+
+def test_broker_instruments():
+    from broker.instruments import get_option_token, refresh_instruments, get_nfo_tokens_for_symbols
+    assert callable(get_option_token)
+    assert callable(refresh_instruments)
+    assert callable(get_nfo_tokens_for_symbols)
+    assert get_option_token("") is None
 
 
 def test_broker_feed_websocket():

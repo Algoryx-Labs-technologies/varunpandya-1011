@@ -33,9 +33,11 @@ class TradingBot:
     """Main trading bot orchestrator"""
     
     def __init__(self):
-        # Initialize components
+        # Initialize components: broker for orders/risk; optional separate broker for market data (feed credentials)
         self.broker = AngelOneBroker()
-        self.data_fetcher = DataFetcher(self.broker)
+        use_market_feed = getattr(Config, "USE_MARKET_FEED", False)
+        self._data_broker = AngelOneBroker(use_market_feed=True) if use_market_feed else self.broker
+        self.data_fetcher = DataFetcher(self._data_broker)
         self.level_manager = LevelManager()
         self.strategy = TradingStrategy(self.level_manager)
         self.position_sizer = PositionSizer()
@@ -67,16 +69,43 @@ class TradingBot:
         logger.info("Initializing trading bot...")
         if not getattr(Config, "PAPER_TRADING", True):
             logger.warning("LIVE trading enabled - orders will be sent to broker")
-        # Connect to broker
+        # Connect trading broker (for orders/positions/risk)
         if not self.broker.connect():
-            logger.error("Failed to connect to Angel One API")
+            logger.error("Failed to connect to Angel One API (trading)")
             return False
-        # Start real-time WebSocket feed for index LTP (optional)
+        # When using separate market feed, connect data broker for OHLC/Greeks/feed
+        if self._data_broker is not self.broker:
+            if not self._data_broker.connect():
+                logger.warning("Market feed broker failed to connect; data/feed will use trading broker")
+                self._data_broker = self.broker
+                self.data_fetcher = DataFetcher(self.broker)
+            else:
+                _step("main", "initialize", "Market feed broker connected (data + WebSocket)")
+        # Start real-time WebSocket feed: index LTP + optional NFO option tokens (per SmartAPI WebSocket2)
         try:
             from broker.feed_websocket import AngelOneFeed
+            from broker.instruments import get_option_token
             self._feed = AngelOneFeed()
-            if self._feed.start(self.broker):
-                _step("main", "initialize", "WebSocket feed started")
+            nfo_tokens = []
+            indices = list(getattr(Config, "INDEX_SYMBOLS", {}).keys() or ["NIFTY", "BANKNIFTY"])
+            for index in indices:
+                chain = self.data_fetcher.fetch_option_chain(index)
+                if not chain:
+                    continue
+                for key in ("calls", "puts"):
+                    df = chain.get(key)
+                    if df is None or not hasattr(df, "iloc") or df.empty or "symbol" not in df.columns:
+                        continue
+                    for i in range(min(50, len(df))):
+                        sym = (df.iloc[i].get("symbol") if hasattr(df.iloc[i], "get") else None) or ""
+                        if sym and isinstance(sym, str):
+                            tok = get_option_token(sym, refresh_if_missing=False)
+                            if tok and tok not in nfo_tokens:
+                                nfo_tokens.append(tok)
+                if len(nfo_tokens) >= 100:
+                    break
+            if self._feed.start(self._data_broker, nfo_tokens=nfo_tokens if nfo_tokens else None):
+                _step("main", "initialize", "WebSocket feed started" + (f" (index + {len(nfo_tokens)} NFO)" if nfo_tokens else ""))
         except Exception as e:
             logger.debug("WebSocket feed not started: %s", e)
             self._feed = None
@@ -274,8 +303,22 @@ class TradingBot:
                 except (IndexError, KeyError, TypeError, ValueError):
                     pass
 
-            # Get option token (would need to fetch from broker)
-            option_token = str(selected_strike)  # Placeholder; in production fetch from broker instrument list
+            # Resolve option token from Angel One instrument list (NFO)
+            option_token = None
+            if option_symbol:
+                try:
+                    from broker.instruments import get_option_token
+                    option_token = get_option_token(option_symbol)
+                except Exception as e:
+                    logger.debug("get_option_token failed: %s", e)
+            if not option_token:
+                logger.error(
+                    "Could not resolve NFO token for option symbol '%s' (Angel One instrument list). Check broker/instruments.py and Scrip Master.",
+                    option_symbol or "(empty)"
+                )
+                return
+
+            exchange_nfo = getattr(Config, "EXCHANGE_NFO", "NFO")
 
             # Place order (skip in paper trading mode)
             paper = getattr(Config, 'PAPER_TRADING', False)
@@ -292,7 +335,8 @@ class TradingBot:
                     token=option_token,
                     quantity=quantity,
                     price=option_price,
-                    order_type="LIMIT"
+                    order_type="LIMIT",
+                    exchange=exchange_nfo,
                 )
             else:
                 order_response = self.broker.place_sell_order(
@@ -300,7 +344,8 @@ class TradingBot:
                     token=option_token,
                     quantity=quantity,
                     price=option_price,
-                    order_type="LIMIT"
+                    order_type="LIMIT",
+                    exchange=exchange_nfo,
                 )
             if order_response and order_response.get('status'):
                 signal.status = 'executed'
